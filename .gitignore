@@ -1,0 +1,71 @@
+# Compiled Lua sources
+luac.out
+
+# luarocks build files
+*.src.rock
+*.zip
+*.tar.gz
+
+# Object files
+*.o
+*.os
+*.ko
+*.obj
+*.elf
+
+# Precompiled Headers
+*.gch
+*.pch
+
+# Libraries
+*.lib
+*.a
+*.la
+*.lo
+*.def
+*.exp
+
+# Shared objects (inc. Windows DLLs)
+*.dll
+*.so
+*.so.*
+*.dylib
+
+# Claude Code personal instructions / settings (not shared)
+CLAUDE.local.md
+.claude/settings.local.json
+
+# Datamined DB2 CSV cache for tools/generate_mount_zones.py
+.wago-cache/
+
+# Python bytecode cache (tools/)
+__pycache__/
+*.pyc
+
+# Embedded libraries.
+# LibStub, CallbackHandler-1.0, LibDBIcon-1.0 are vendored (committed) -- no maintained
+# non-legacy git source. LibDataBroker-1.1 + HereBeDragons are fetched by the packager
+# (.pkgmeta); kept on disk for local testing but not committed. libs.json is a Mechanic
+# tool file, not shipped (see .pkgmeta ignore).
+Mount_Tracker_Local_Zones/Libs/*
+!Mount_Tracker_Local_Zones/Libs/LibStub/
+!Mount_Tracker_Local_Zones/Libs/CallbackHandler-1.0/
+!Mount_Tracker_Local_Zones/Libs/LibDBIcon-1.0/
+
+# Executables
+*.exe
+*.out
+*.app
+*.i*86
+*.x86_64
+*.hex
+
+
+# Claude Code project settings / linked worktrees (machine-local)
+.claude/settings.json
+.claude/worktrees/
+
+# MCP server config (contains machine-specific absolute paths)
+.mcp.json
+
+assets/

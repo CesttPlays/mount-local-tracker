@@ -1,0 +1,27 @@
+package-as: Mount_Tracker_Local_Zones
+
+enable-nolib-creation: no
+
+# The addon lives in a subdirectory of the repo; hoist it to the zip root.
+move-folders:
+  Mount_Tracker_Local_Zones/Mount_Tracker_Local_Zones: Mount_Tracker_Local_Zones
+
+# LibStub, CallbackHandler-1.0 and LibDBIcon-1.0 are vendored under Libs/ (committed):
+# no maintained non-legacy git source, and all three are tiny and effectively frozen.
+externals:
+  Mount_Tracker_Local_Zones/Libs/LibDataBroker-1.1: https://github.com/tekkub/libdatabroker-1-1
+  Mount_Tracker_Local_Zones/Libs/HereBeDragons: https://github.com/Nevcairiel/HereBeDragons
+
+ignore:
+  - Mount_Tracker_Local_Zones/Mechanic.lua
+  - Mount_Tracker_Local_Zones/Libs/libs.json
+  - .github
+  - .wago-cache
+  - context
+  - tools
+  - tests
+  - run-tests.ps1
+  - .gitignore
+  - .luacheckrc
+  - CLAUDE.local.md
+  - CURSEFORGE.md
