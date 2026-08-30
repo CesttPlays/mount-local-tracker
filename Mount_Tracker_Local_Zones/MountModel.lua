@@ -261,6 +261,14 @@ local function BuildRow(mountID)
 		point = PointFor(mountID),
 	}
 
+	-- Vendor-purchase mounts have no spawn point of their own. When the user opts
+	-- in (db.showVendorIcons), fall back to the vendor's location so Map.lua pins
+	-- them at the merchant. The right-click "... (vendor)" waypoint actions work
+	-- regardless of this toggle (see Core.VendorLocation).
+	if not row.point and db.showVendorIcons and addon.VendorLocation then
+		row.point = addon.VendorLocation(mountID)
+	end
+
 	local verdict = Obtainability and Obtainability.Evaluate(mountID, row)
 		or { state = isCollected and "collected" or "drop", sortRank = 99 }
 	row.state = verdict.state

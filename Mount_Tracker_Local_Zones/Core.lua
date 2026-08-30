@@ -17,6 +17,7 @@ local defaults = {
 	hiddenSources = {}, -- [sourceType] = true -- catalog-style "hide this whole source" filter
 	showMapIcons = true,
 	showMinimapIcons = true,
+	showVendorIcons = true, -- also pin vendor-purchase mounts at their vendor's location
 	showMinimapButton = true,
 	debug = false,
 	collapsed = {}, -- [groupKey] = true
@@ -235,17 +236,38 @@ local function PlaceUserWaypoint(point)
 end
 
 -- Hand a MountData point to TomTom as a "crazy arrow" waypoint. Caller checks
--- that TomTom is loaded before offering this.
-local function SetTomTomWaypoint(point, mountID)
+-- that TomTom is loaded before offering this. `title` overrides the default
+-- (the mount name) -- the vendor actions pass "<mount> - <npc>".
+local function SetTomTomWaypoint(point, mountID, title)
 	if type(TomTom) ~= "table" or type(TomTom.AddWaypoint) ~= "function" then
 		return
 	end
 	TomTom:AddWaypoint(point[1], point[2] / 10000, point[3] / 10000, {
-		title = MountName(mountID),
+		title = title or MountName(mountID),
 		from = "Mount Tracker",
 		crazy = true,
 	})
 end
+
+-- The curated vendor entry's map location as a { uiMapID, x, y } triple (x/y on
+-- the same 0-10000 scale as MountData.points) plus the NPC name, when the entry
+-- carries coordinates. Vendor-purchase mounts have no spawn point of their own,
+-- so this is what the "... (vendor)" waypoint actions and the opt-in vendor map
+-- pins aim at. Returns nil when there is no vendor entry or it has no position.
+local function VendorLocation(mountID)
+	local vendor = (addon.MountOverrides and addon.MountOverrides.vendor and addon.MountOverrides.vendor[mountID])
+		or (addon.MountData and addon.MountData.vendor and addon.MountData.vendor[mountID])
+	if type(vendor) ~= "table" then
+		return nil
+	end
+	local uiMapID, x, y = vendor.uiMapID, vendor.x, vendor.y
+	if type(uiMapID) == "number" and type(x) == "number" and type(y) == "number" then
+		return { uiMapID, x, y }, vendor.npc
+	end
+	return nil
+end
+
+addon.VendorLocation = VendorLocation
 
 -- Right-click context menu for a mount row / map pin. Location actions only
 -- appear when we have coordinates for that mount.
@@ -261,21 +283,37 @@ local function ShowMountMenu(frame)
 
 	local point = (addon.MountOverrides and addon.MountOverrides.points and addon.MountOverrides.points[mountID])
 		or (addon.MountData and addon.MountData.points and addon.MountData.points[mountID])
+	local vendorPoint, vendorNPC = VendorLocation(mountID)
 	local isCollected = select(11, MountInfo(mountID))
+
+	local hasTomTom = type(C_AddOns) == "table"
+		and type(C_AddOns.IsAddOnLoaded) == "function"
+		and C_AddOns.IsAddOnLoaded("TomTom")
 
 	MenuUtil.CreateContextMenu(frame, function(_, rootDescription)
 		rootDescription:CreateTitle(MountName(mountID))
+
+		-- A datamined spawn point wins; otherwise fall back to the vendor's
+		-- location so vendor-purchase mounts still get a waypoint.
 		if point then
 			rootDescription:CreateButton("Place map pin", function()
 				PlaceUserWaypoint(point)
 			end)
-			if
-				type(C_AddOns) == "table"
-				and type(C_AddOns.IsAddOnLoaded) == "function"
-				and C_AddOns.IsAddOnLoaded("TomTom")
-			then
+			if hasTomTom then
 				rootDescription:CreateButton("Set TomTom waypoint", function()
 					SetTomTomWaypoint(point, mountID)
+				end)
+			end
+		elseif vendorPoint then
+			rootDescription:CreateButton("Place map pin (vendor)", function()
+				PlaceUserWaypoint(vendorPoint)
+			end)
+			if hasTomTom then
+				rootDescription:CreateButton("Set TomTom waypoint (vendor)", function()
+					local title = vendorNPC
+						and ("%s \194\183 %s"):format(MountName(mountID), vendorNPC)
+						or MountName(mountID)
+					SetTomTomWaypoint(vendorPoint, mountID, title)
 				end)
 			end
 		end

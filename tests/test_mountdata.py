@@ -215,6 +215,14 @@ class TestOverrides(unittest.TestCase):
             self.assertGreaterEqual(cost, 0)
             uimap_id = entry["uiMapID"]
             self.assertIsInstance(uimap_id, (int, float), f"mount {mount_id} vendor uiMapID")
+            # x / y are optional, but when present they must be an in-range point
+            # coordinate (same 0-10000 scale as points) so the vendor map-pin /
+            # TomTom-waypoint fallback can use them directly.
+            for axis in ("x", "y"):
+                if axis in entry:
+                    value = entry[axis]
+                    self.assertIsInstance(value, (int, float), f"mount {mount_id} vendor {axis} {value!r}")
+                    self.assertTrue(0 <= value <= 10000, f"mount {mount_id} vendor {axis}={value}")
 
     def test_rep_faction_entries_are_number_pairs(self):
         for mount_id, entry in self.ov["repFaction"].items():
