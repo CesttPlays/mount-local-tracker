@@ -21,8 +21,15 @@
    mount link verified on 12.1.0.69497. `MountData.lua` regenerated (293 zones / 1846 refs /
    988 global). `tests/test_generator.py` — 35 tests green. luacheck green. See context-cache.md
    "Data pipeline" for the offline `wow.tools.local` DB2 procedure.
-3. **MountModel + ListView + Window** — zone → grouped uncollected mounts, the tracker
-   window. Done when `python tests/run.py` (smoke) is green.
+3. **MountModel + Obtainability + ListView + Window** — DONE. `Obtainability.lua`
+   (Evaluate → collected/available/rep_gated/achievement_gated/reset_locked/farmable/drop +
+   tooltip lines), `MountModel.lua` (CandidateSet/GlobalCandidateSet, BuildRow with 6 filters,
+   GroupRows by source *and* expansion, GetZoneMounts + cache, Summary, RefreshCachedStates),
+   `ListView.xml`/`ListView.lua` (grouped ScrollBox, Obtainability colours, Global divider),
+   `Window.lua` (chrome port + summary line "Zone — C/T collected · N available · a/b account").
+   `tests/` smoke harness ported: `python tests/run.py` → cold 55/55, warm 62/62, exit 0.
+   luacheck green (8 files). Notes for phase-8 in-game check: verify `GetMountInfoByID` tuple
+   order, `GameTooltip:SetMountBySpellID`, ScrollBox API, stylized summary-line layout.
 4. **Config + MinimapButton** — Settings panel incl. the `groupBy` dropdown; minimap launcher.
 5. **Map** — world-map + minimap pins for positioned uncollected mounts.
 6. **Overrides.lua seed** — ~25 well-known curated rare-drop / vendor mounts with coords.

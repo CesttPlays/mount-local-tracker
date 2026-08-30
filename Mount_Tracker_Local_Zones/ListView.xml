@@ -1,0 +1,33 @@
+<Ui xmlns="http://www.blizzard.com/wow/ui/">
+    <!-- Empty named Button templates: the ScrollBox pools element frames by
+         template name, so group headers and mount rows need distinct names to
+         keep their pools apart. The mouseover highlight lives here; everything
+         else is built in ListView.lua. -->
+    <Button name="MountTrackerLocalGroupHeaderTemplate" virtual="true">
+        <Layers>
+            <Layer level="HIGHLIGHT">
+                <Texture setAllPoints="true">
+                    <Color r="1" g="1" b="1" a="0.10"/>
+                </Texture>
+            </Layer>
+        </Layers>
+    </Button>
+    <Button name="MountTrackerLocalMountRowTemplate" virtual="true">
+        <Layers>
+            <Layer level="HIGHLIGHT">
+                <Texture setAllPoints="true">
+                    <Color r="1" g="1" b="1" a="0.08"/>
+                </Texture>
+            </Layer>
+        </Layers>
+    </Button>
+    <!-- One entry in the options "Hidden mounts" list; contents built in
+         Config.lua. -->
+    <Frame name="MountTrackerLocalHiddenRowTemplate" virtual="true"/>
+    <!-- Group header in the options "Hidden mounts" list; contents built in
+         Config.lua. Separate pool from the row template. -->
+    <Frame name="MountTrackerLocalHiddenHeaderTemplate" virtual="true"/>
+    <!-- Non-interactive divider between the zone list and the global list;
+         contents are built in ListView.lua. -->
+    <Frame name="MountTrackerLocalSeparatorTemplate" virtual="true"/>
+</Ui>

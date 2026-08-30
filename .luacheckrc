@@ -34,8 +34,9 @@ read_globals = {
     "C_MountJournal", "ToggleCollectionsJournal", "MountJournal_SelectByMountID",
     -- Spells / tooltip / combat
     "C_Spell", "GameTooltip", "InCombatLockdown",
-    -- Obtainability inputs (rep / renown / currency / gold / lockout)
+    -- Obtainability inputs (rep / renown / currency / gold / lockout / achievement)
     "C_Reputation", "C_MajorFactions", "C_CurrencyInfo", "C_QuestLog", "GetMoney",
+    "GetAchievementInfo",
     -- Mount row / map-pin interactions (chat link, context menu, waypoints)
     "IsModifiedClick", "ChatEdit_InsertLink", "ChatFrame_OpenChat",
     "MenuUtil", "C_SuperTrack", "UiMapPoint", "TomTom",
