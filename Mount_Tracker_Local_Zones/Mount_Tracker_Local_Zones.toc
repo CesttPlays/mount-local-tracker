@@ -21,6 +21,7 @@ MountModel.lua
 ListView.xml
 ListView.lua
 Window.lua
+Map.lua
 Config.lua
 MinimapButton.lua
 

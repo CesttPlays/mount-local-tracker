@@ -44,7 +44,7 @@ end
 
 for _, key in ipairs({
     "SafeApiCall", "Print", "IsMountApiReady", "GetCurrentLocationName",
-    "InitializeAddon", "MountModel", "Obtainability", "ListView",
+    "InitializeAddon", "MountModel", "Obtainability", "ListView", "Map",
     "MountData", "MountOverrides", "MountInfo", "BindMount",
     "InitializeWindow", "ToggleWindow", "RefreshWindow", "PrintZoneList",
     "IsWindowShown", "ResetWindow", "defaults",
@@ -115,6 +115,40 @@ step("hide then restore a mount", function()
     Harness.runTimers()
     check("mount restored", addon.db.hidden[victim] == nil)
 end)
+
+-- ---------------------------------------------------------------------------
+-- Map / minimap pins (Map.lua)
+-- ---------------------------------------------------------------------------
+check("addon.Map exposes Refresh / Rebuild / Invalidate",
+    type(addon.Map.Refresh) == "function"
+        and type(addon.Map.Rebuild) == "function"
+        and type(addon.Map.Invalidate) == "function")
+
+step("Map.Rebuild + Map.Refresh do not throw", function()
+    addon.Map.Rebuild()
+    addon.Map.Refresh()
+end)
+
+if SCENARIO == "warm" then
+    step("warm: a curated point places a world + minimap pin", function()
+        addon.Map.Rebuild()
+        check("world pin placed for the positioned mount", Stub.data.worldPins > 0,
+            "AddWorldMapIconMap was never called")
+        check("minimap pin placed for the positioned mount", Stub.data.minimapPins > 0,
+            "AddMinimapIconMap was never called")
+    end)
+
+    step("warm: turning both icon sets off places nothing", function()
+        addon.db.showMapIcons = false
+        addon.db.showMinimapIcons = false
+        addon.Map.Rebuild()
+        check("no world pins with showMapIcons off", Stub.data.worldPins == 0, Stub.data.worldPins)
+        check("no minimap pins with showMinimapIcons off", Stub.data.minimapPins == 0, Stub.data.minimapPins)
+        addon.db.showMapIcons = true
+        addon.db.showMinimapIcons = true
+        addon.Map.Rebuild()
+    end)
+end
 
 -- ---------------------------------------------------------------------------
 -- Obtainability engine

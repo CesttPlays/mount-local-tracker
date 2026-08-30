@@ -36,7 +36,11 @@
    via a metatable proxy. `MinimapButton.lua`: LDB + LibDBIcon launcher. Smoke: cold 67/67,
    warm 74/74; luacheck 10 files. Phase-8 check: 11.0.2 `RegisterAddOnSetting` signature, the
    proxy-table binding (rawget/rawset risk), canvas subcategory, minimap clicks.
-5. **Map** — world-map + minimap pins for positioned uncollected mounts.
+5. **Map** — DONE. `Map.lua` (port of the sibling): one HBD-Pins pin per uncollected mount
+   with a `row.point`, world + minimap, coloured by obtainability state, gated pins dimmed.
+   `MountData.points` is empty so **no pins until Overrides.points is seeded (phase 6)**.
+   Smoke: cold 70/70, warm 83/83 (warm seeds a curated point → asserts a pin is placed);
+   luacheck 11 files. Phase-8 check: HBD-Pins API arg order on 12.1, pins clear on collect.
 6. **Overrides.lua seed** — ~25 well-known curated rare-drop / vendor mounts with coords.
 7. **tests/ full port + CI + release workflows + context/ refresh** —
    `tests/{run,stub,smoke,init,harness}.lua`, `tests/test_*.py`, `run-tests.ps1`,

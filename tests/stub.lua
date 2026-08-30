@@ -177,6 +177,8 @@ local D = {
     achievements = {},   -- [achID] = { name=, completed= }
     openedCategory = nil, -- last Settings.OpenToCategory argument
     settings = {},       -- [variableKey] = { get=, set=, fireChanged= } (options panel bindings)
+    worldPins = 0,       -- HBDPins:AddWorldMapIconMap call count since the last RemoveAll
+    minimapPins = 0,     -- HBDPins:AddMinimapIconMap call count since the last RemoveAll
 }
 Stub.data = D
 
@@ -348,10 +350,10 @@ function Stub.install()
     -- their real code paths instead of bailing at the `nil` guard.
     local libs = {
         ["HereBeDragons-Pins-2.0"] = {
-            RemoveAllWorldMapIcons = noop,
-            RemoveAllMinimapIcons = noop,
-            AddWorldMapIconMap = function() return true end,
-            AddMinimapIconMap = noop,
+            RemoveAllWorldMapIcons = function() D.worldPins = 0 end,
+            RemoveAllMinimapIcons = function() D.minimapPins = 0 end,
+            AddWorldMapIconMap = function() D.worldPins = D.worldPins + 1; return true end,
+            AddMinimapIconMap = function() D.minimapPins = D.minimapPins + 1 end,
         },
         ["LibDataBroker-1.1"] = {
             NewDataObject = function(_, _, obj) return obj end,
@@ -367,6 +369,7 @@ function Stub.install()
         GetLibrary = function(_, name) return libs[name] end,
         NewLibrary = function() return nil end,
     }, { __call = function(_, name) return libs[name] end })
+    _G.HBD_PINS_WORLDMAP_SHOW_PARENT = 1
 
     -- Zone / faction
     _G.GetRealZoneText = function() return D.zone end

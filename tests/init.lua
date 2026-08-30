@@ -38,6 +38,9 @@ if SCENARIO == "warm" then
         vendor = { [11] = { npc = "Katie Stokx", cost = 500 } },
         repFaction = { [18] = { factionID = 2600, standing = 20 } },
         note = { [8] = "Class mount -- learned from a quest chain." },
+        -- 8 is an uncollected global mount; a curated point makes Map.Compute
+        -- place a world + minimap pin for it.
+        points = { [8] = { 84, 5000, 5000 } },
     }
 end
 
