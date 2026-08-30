@@ -35,7 +35,12 @@ if SCENARIO == "warm" then
     --   11 -> a vendor mount you can afford  -> state "available"
     --   18 -> a renown mount you're short on -> state "rep_gated"
     D.overrides = {
-        vendor = { [11] = { npc = "Katie Stokx", cost = 500 } },
+        -- 11 -> affordable, positioned vendor. 18 -> renown-gated *and* sold by a
+        -- positioned vendor, so the vendor map-pin / waypoint fallback has a target.
+        vendor = {
+            [11] = { npc = "Katie Stokx", uiMapID = 84, x = 5000, y = 5000, cost = 500 },
+            [18] = { npc = "Katie Stokx", uiMapID = 84, x = 5200, y = 4800, cost = 500 },
+        },
         repFaction = { [18] = { factionID = 2600, standing = 20 } },
         note = { [8] = "Class mount -- learned from a quest chain." },
         -- 8 is an uncollected global mount; a curated point makes Map.Compute

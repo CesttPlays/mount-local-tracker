@@ -31,7 +31,7 @@ local function OnSettingChanged(key)
 		if addon.ApplyMinimapButton then
 			addon.ApplyMinimapButton()
 		end
-	elseif key == "showMapIcons" or key == "showMinimapIcons" then
+	elseif key == "showMapIcons" or key == "showMinimapIcons" or key == "showVendorIcons" then
 		if addon.Map then
 			addon.Map.Rebuild()
 		end
@@ -427,6 +427,12 @@ function addon.SetupConfig()
 		"showMinimapIcons",
 		"Show minimap icons",
 		"An icon on the minimap for each nearby uncollected mount that has a known location."
+	)
+	AddCheckbox(
+		category,
+		"showVendorIcons",
+		"Show vendor icons",
+		"Also mark the vendor on the map for mounts you can buy."
 	)
 
 	Settings.RegisterAddOnCategory(category)

@@ -45,7 +45,7 @@ end
 for _, key in ipairs({
     "SafeApiCall", "Print", "IsMountApiReady", "GetCurrentLocationName",
     "InitializeAddon", "MountModel", "Obtainability", "ListView", "Map",
-    "MountData", "MountOverrides", "MountInfo", "BindMount",
+    "MountData", "MountOverrides", "MountInfo", "BindMount", "VendorLocation",
     "InitializeWindow", "ToggleWindow", "RefreshWindow", "PrintZoneList",
     "IsWindowShown", "ResetWindow", "defaults",
     "SetupConfig", "OpenConfig", "SetupMinimapButton", "ApplyMinimapButton",
@@ -146,6 +146,31 @@ if SCENARIO == "warm" then
         check("no minimap pins with showMinimapIcons off", Stub.data.minimapPins == 0, Stub.data.minimapPins)
         addon.db.showMapIcons = true
         addon.db.showMinimapIcons = true
+        addon.Map.Rebuild()
+    end)
+
+    step("warm: a positioned vendor mount resolves a vendor waypoint", function()
+        local point, npc = addon.VendorLocation(18)
+        check("VendorLocation returns the vendor's { uiMapID, x, y }",
+            type(point) == "table" and point[1] == 84 and point[2] == 5200, point and point[1])
+        check("VendorLocation returns the NPC name", npc == "Katie Stokx", npc)
+        check("VendorLocation is nil for a mount with no vendor entry",
+            addon.VendorLocation(99999) == nil)
+    end)
+
+    step("warm: showVendorIcons adds a map pin for the positioned vendor mount", function()
+        addon.db.showVendorIcons = false
+        addon.MountModel.InvalidateCache()
+        addon.Map.Rebuild()
+        local without = Stub.data.worldPins
+        addon.db.showVendorIcons = true
+        addon.MountModel.InvalidateCache()
+        addon.Map.Rebuild()
+        local withOn = Stub.data.worldPins
+        check("enabling showVendorIcons adds at least one world pin", withOn > without,
+            ("without=%s with=%s"):format(tostring(without), tostring(withOn)))
+        addon.db.showVendorIcons = false
+        addon.MountModel.InvalidateCache()
         addon.Map.Rebuild()
     end)
 end
