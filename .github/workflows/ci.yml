@@ -1,0 +1,78 @@
+name: CI
+
+# Static analysis + the offline test suites. None of this is an in-game test
+# (see tests/README.md) -- it is a regression net for load/runtime errors, the
+# data-generator transforms, and the shape of the shipped MountData.lua.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  lint:
+    name: luacheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install luacheck
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends lua5.1 luarocks
+          sudo luarocks install luacheck
+
+      - name: Run luacheck
+        run: luacheck .
+
+  smoke:
+    name: headless smoke tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install lupa (bundled Lua 5.1 / LuaJIT)
+        run: python -m pip install --quiet lupa
+
+      - name: Run smoke tests
+        run: python tests/run.py
+
+  generator:
+    name: generator unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install lupa (used by the render-output check)
+        run: python -m pip install --quiet lupa
+
+      - name: Run generator unit tests
+        run: python -m unittest discover -s tests -p "test_generator.py" -v
+
+  data:
+    name: mount-data integrity
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install lupa (loads MountData.lua / Overrides.lua)
+        run: python -m pip install --quiet lupa
+
+      - name: Check MountData.lua / Overrides.lua structure
+        run: python -m unittest discover -s tests -p "test_mountdata.py" -v
+
+      - name: Check TOC / packaging consistency
+        run: python -m unittest discover -s tests -p "test_toc.py" -v

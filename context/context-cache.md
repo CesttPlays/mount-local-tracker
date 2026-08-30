@@ -1,147 +1,150 @@
 # Context Cache
 
 ## Project identity
-- Project: mount-local-tracker (WoW addon "Mount Tracker: Local Zones"). Target build: retail Midnight 12.1 (`## Interface: 120100`, to match the sibling repo).
-- Goal: a zone-aware mount tracker window — show the mounts you can still collect in the
-  player's current zone (dungeon/raid drops for instances there, rare-mob drops, vendor
-  mounts, quest-reward mounts, zone drops), with a movable/resizable UI. Follows the player
+- Project: mount-local-tracker (WoW addon "Mount Tracker: Local Zones"). Target build: retail
+  Midnight 12.1 (`## Interface: 120100`).
+- Goal: a zone-aware, obtainability-aware mount tracker — a window listing the mounts you can
+  still collect in the player's current zone, each row saying whether you can get it now
+  (vendor / affordable), are short on reputation, or the weekly farm is up. Follows the player
   as they change zones.
 - Sibling project: `achivement-local-tracker` (`D:\Propio\GitHub\achivement-local-tracker`),
-  built first by the same solo dev. This project deliberately mirrors its architecture,
-  tests, CI, and release flow — achievements swapped for `C_MountJournal` mounts.
+  built first by the same solo dev. This project mirrors its architecture, tests, CI and
+  release flow — `C_MountJournal` mounts in place of achievements.
 - Solo developer, new to Lua and the WoW API, plans to publish (CurseForge/WoWInterface).
-  Keep code release-quality; no debug spam on by default.
-- Status: **greenfield / planning**. Repo has `.git`, `.gitignore`, `README.md`, `.claude/`,
-  `context/`, `CLAUDE.local.md`. No addon code yet. Plan approved 2026-08-30.
+  Release-quality; no debug spam on by default.
+- Status: **phases 1-7 built on branch `phase-buildout`**, all green offline. Not yet
+  validated in-game, not merged to `main`, not released. Plan approved 2026-08-30.
 - Last updated: 2026-08-30
 
 ## Locked decisions (2026-08-30)
-- **Addon folder**: `Mount_Tracker_Local_Zones/` (underscore style, matches the sibling repo
-  visually; spelled correctly — the sibling regrets shipping its "Achivement" folder typo).
-- **SavedVariables**: `MountTrackerLocalZonesDB`. **Slash**: `/mtlz`.
-- **Data strategy**: hybrid — a Python DB2 generator (`tools/generate_mount_zones.py`)
-  resolves what it can, unresolved mounts go to a hand-curated `Overrides.lua` and a
-  `global` bucket. Same shape as the sibling's `ZoneData.lua` + `Overrides.lua`.
-- **List grouping**: a `db.groupBy` dropdown setting — `"source"` (by source type, default)
-  and `"expansion"` (by expansion). Extensible to more modes later.
+- **Addon folder**: `Mount_Tracker_Local_Zones/` (spelled correctly). **SavedVariables**:
+  `MountTrackerLocalZonesDB`. **Slash**: `/mtlz`.
+- **Data strategy**: hybrid — a stdlib-only Python DB2 generator resolves what it can, the
+  rest is hand-curated in `Overrides.lua` + a `global` bucket.
+- **List grouping**: `db.groupBy` — `"source"` (default) or `"expansion"`.
+- **Source-filter checkboxes** read "Show X" but store the inverted `db.hiddenSources[type]`
+  via a metatable proxy (Config.lua).
 
 ## Working policy
 - `.toc` / `.lua` are the implementation truth. Verify any new WoW API against
-  warcraft.wiki.gg before use; the defensive pattern is `type(fn)=="function"` + `pcall` +
-  result-type check (`SafeApiCall` / `SafeApiCallMulti`, ported from the sibling's Core.lua).
-- `context/wow-api-reference-cache.md` = verified-API cache; add only after in-game validation.
-- Immediate steps beat future features. Test every runtime change in-game before committing
-  ([[no-push-until-tested]]); deploy = copy the whole `Mount_Tracker_Local_Zones/` folder to
+  warcraft.wiki.gg; defensive pattern is `type(fn)=="function"` + `pcall` + result-type check
+  (`SafeApiCall` / `SafeApiCallMulti` in Core.lua).
+- `context/wow-api-reference-cache.md` = verified-API cache; move an entry to "validated"
+  only after its code path runs clean in the live client.
+- Deploy = copy the whole `Mount_Tracker_Local_Zones/` folder to
   `E:\Blizzard\World of Warcraft\_retail_\Interface\AddOns\Mount_Tracker_Local_Zones\`.
-- On "it works", update `context/` BEFORE committing so docs ride the same PR
+- On "it works", update `context/` BEFORE committing so docs ride the same commit
   ([[bundle-context-updates-into-feature-commit]]).
 
-## Planned architecture (not built yet — ported from the sibling repo)
-Files loaded in TOC order:
-- **Core.lua** — bootstrap, SavedVariables (`MountTrackerLocalZonesDB`, loaded on
-  `ADDON_LOADED` with a defaults merge), events, slash commands, `SafeApiCall*`, location
-  helpers, `Debounced` coalescing helper. `addon.defaults` is the single source of truth
-  for setting defaults (Config reads it). Shared mount-frame helper `BindMount(frame)` —
-  hover tooltip (`GameTooltip:SetMountBySpellID(spellID)`), left-click opens the Mount
-  Journal to the mount (`ToggleCollectionsJournal(1)` + `MountJournal_SelectByMountID`),
-  shift-left-click links the mount spell to chat, right-click `MenuUtil.CreateContextMenu`
-  (place map pin / TomTom waypoint if positioned; Summon if collected; Hide this mount).
-  Events: `PLAYER_LOGIN/LOGOUT/ENTERING_WORLD`, `ZONE_CHANGED*`, `NEW_MOUNT_ADDED`,
-  `MOUNT_JOURNAL_USABILITY_CHANGED`.
+## Architecture (built — TOC load order)
+- **Core.lua** — SavedVariables (`ADDON_LOADED` + recursive defaults merge; `addon.defaults`
+  is the single source of truth), `SafeApiCall*`, `Debounced`, location helpers,
+  `IsMountApiReady` + retry, `/mtlz [show|list|config|map|debug|reset]`, events
+  (`PLAYER_LOGIN/LOGOUT/ENTERING_WORLD`, `ZONE_CHANGED*`, `NEW_MOUNT_ADDED`,
+  `MOUNT_JOURNAL_USABILITY_CHANGED`). `BindMount(frame)` — hover tooltip
+  (`GameTooltip:SetMountBySpellID` + obtainability lines), left-click opens the Mount Journal
+  to the mount, shift-click links the spell, right-click `MenuUtil` menu (map pin / TomTom /
+  Summon if collected / Hide). Reads `frame.mountID` / `frame.spellID` live.
 - **MountData.lua** — GENERATED by `tools/generate_mount_zones.py`. Shape:
-  `addon.MountData = { build, updated, zones=[uiMapID]->{mountID}, faction=[mountID]->0|1,
-  points=[mountID]->{uiMapID,x,y}, source=[mountID]->"instance"|"drop"|"vendor"|"quest"|
-  "zonedrop"|"worldevent"|"achievement", expansion=[mountID]->expansionID, global={mountID,...} }`.
-  `mountID` = the `C_MountJournal` id = DB2 `Mount.ID` (no mapping needed on modern clients).
-  Do not hand-edit.
-- **Overrides.lua** — hand-maintained `addon.MountOverrides = { add, remove, faction,
-  source, points }`, merged at runtime so edits survive regeneration. Home for curated
-  open-world rare drops and gold-vendor mounts.
-- **MountModel.lua** — `CandidateSet(mapIDs)` merges generated `zones` + `Overrides.add`,
-  applies `Overrides.remove`. `GetZoneMounts()` resolves the current uiMapID + parent chain,
-  builds rows, groups per `db.groupBy`, computes collected/uncollected state, filters
-  collected (unless `showCollected`) / faction / `db.hidden`. Result cached by
-  zone|groupBy|showCollected|showGlobal key. `RefreshCachedStates()` re-evaluates shown rows
-  on `NEW_MOUNT_ADDED`. `global` bucket appended when `db.showGlobal`.
-- **ListView.xml / ListView.lua** — collapsible grouped list on the Blizzard ScrollBox
-  (`WowScrollBoxList`), pooled header/row/separator elements; rows get behaviour from Core's
-  `BindMount`. Ported near-verbatim from the sibling.
-- **Window.lua** — the frame + render orchestration. User-selectable chrome via
-  `db.windowStyle` (`"stylized"` | `"classic"`). Movable + resizable, geometry persisted.
-- **Map.lua** — one world-map + minimap pin per uncollected positioned mount, via vendored
-  HereBeDragons-Pins. Instance mounts without a precise point are not pinned (same as the
-  sibling's dungeon achievements).
-- **Config.lua** — Settings API panel. Sections: **Window** (`windowStyle`, `reopenWindow`),
-  **Mount list** (`groupBy` dropdown, `showCollected`, `showGlobal`), **Map & minimap**
-  (`showMinimapButton`, `showMapIcons`, `showMinimapIcons`). Plus a "Hidden mounts" canvas
-  subcategory (restore list). `/mtlz config` opens it.
-- **MinimapButton.lua** — LibDataBroker + LibDBIcon launcher. Left-click toggles the tracker,
-  right-click opens options.
+  `{ build, updated, zones=[uiMapID]->{mountID}, source=[mountID]->str, subcat, expansion,
+  faction=[mountID]->0|1, points={}, achievementID={}, repFaction={}, vendor={},
+  global={mountID,...} }`. Do not hand-edit.
+- **Overrides.lua** — hand-maintained `addon.MountOverrides = { add, remove, source, subcat,
+  points, faction, expansion, dropChance, lockout, lockoutQuest, vendor, repFaction, note }`,
+  merged at runtime (Overrides wins). Seeded with ~30 well-known mounts (phase 6).
+- **Obtainability.lua** — pure `Evaluate(mountID, row) -> { state, detail, sortRank }`:
+  `collected | available | farmable | drop | quest_gated | rep_gated | achievement_gated |
+  reset_locked`. Reads the curated inputs + live player APIs (`C_Reputation`,
+  `C_MajorFactions`, `C_CurrencyInfo`, `GetMoney`, `GetAchievementInfo`,
+  `C_QuestLog.IsQuestFlaggedCompleted`). `AddTooltipLines(tooltip, mountID)` for Core.BindMount.
+- **MountModel.lua** — `CandidateSet(mapIDs)` (MountData.zones + Overrides.add, minus
+  Overrides.remove), `GlobalCandidateSet()`, `BuildRow(mountID)` (6 filters: collected /
+  faction / hidden / hiddenSources / obtainable-only / unusable), `GroupRows(ids, groupBy)`
+  (by source label or expansion, rows sorted by sortRank then name), `GetZoneMounts()`
+  (player map + parent chain, 7-part cache key), `RefreshCachedStates()`, `Summary()`
+  (zone + account collected/total/available), `StatusFor`, `Warm`, `InvalidateCache`.
+- **ListView.xml / ListView.lua** — collapsible grouped Blizzard ScrollBox list; rows
+  coloured by obtainability state, unusable dimmed, "Global" separator before the no-home
+  groups. `addon.BindMount` for row behaviour.
+- **Window.lua** — movable/resizable frame, `db.windowStyle` (`stylized`|`classic`), geometry
+  to `db.window`, a summary line ("Zone — C / T collected · N available · a / b account"),
+  live title `Mounts: <zone>`. `addon.PrintZoneList` (chat dump). `NotifyWindowStyleChanged`
+  asks for /reload.
+- **Map.lua** — one HereBeDragons-Pins pin per uncollected mount with a `row.point`, world +
+  minimap, coloured by state (gated dimmed). `Refresh` (no-op if current) / `Rebuild` /
+  `Invalidate`. No pins until `Overrides.points` / `MountData.points` has entries.
+- **Config.lua** — Settings API panel "Mount Tracker: Local Zones": Window / Mount list /
+  Filter by source / Map & minimap sections + "Hidden mounts" canvas subcategory (ScrollBox
+  bucketed by source). `OnSettingChanged` routes each key to the narrowest refresh.
+- **MinimapButton.lua** — LibDataBroker + LibDBIcon launcher (left toggle, right options).
+- **Mechanic.lua** — dev-only debug hub, `#@do-not-package@`.
 - **Libs/** — LibStub, CallbackHandler-1.0, LibDataBroker-1.1, HereBeDragons-2.0/-Pins/-Migrate,
-  LibDBIcon-1.0. Vendored; LibStub/CallbackHandler/LibDBIcon committed, the rest fetched by
-  the BigWigs packager (`.pkgmeta`).
+  LibDBIcon-1.0. First three committed; LDB + HBD fetched by the packager (`.pkgmeta`).
 
-## Data pipeline (built — phase 2, 2026-08-30)
+## Data pipeline (built — phase 2)
 - `tools/generate_mount_zones.py` (stdlib only) pulls wago.tools DB2 CSVs (`--locale enUS`).
   Tables: Mount, SpellName, ItemEffect, ItemXItemEffect, ItemSparse, JournalEncounterItem,
   JournalEncounter, JournalInstance, Map, UiMap, UiMapAssignment.
-- **`Mount.SourceTypeEnum` is unreliable** (huge "Legacy" bucket, `-1` on new mounts) — the
-  generator parses **`Mount.SourceText_lang`** instead, which carries structured labels:
-  `Zone:` / `Location:` (→ the zone name, may be a comma list), `Vendor:`, `Drop:`, `Quest:`,
-  `Faction:`, `Profession:`, `World Event:`, `Cost:` + `|Hcurrency:ID|`, `(Alliance)`/`(Horde)`.
-- Resolution, per mount:
-  1. **Instance drops** — `JournalEncounterItem.ItemID` → the item's teach-spell
-     (`ItemXItemEffect` → `ItemEffect.SpellID`) → `Mount.SourceSpellID`; then
-     `JournalEncounter.JournalInstanceID` → `JournalInstance.MapID` → `UiMapAssignment` → uiMapID.
-     `source="instance"`, `subcat` dungeon/raid from `Map.InstanceType` (1/2). **Verified: the
-     item→spell→mount link resolves — 1674/1680 mounts have a teach item, 67 hit a journal boss.**
-     A journal-boss hit wins outright (no SourceText name match layered on top).
-  2. **`Zone:` / `Location:` name parse** — matched against `UiMap.Name_lang` where
-     `UiMap.Type ∈ {3 Zone, 6 Orphan}` (cities + BGs; **not** 4 Dungeon / 5 Micro). Every
-     name→uiMapID variant is kept (WoW keeps a fresh UI map per expansion/phase, e.g. "Eversong
-     Woods" = 5 ids) so the runtime lookup hits whatever map the player is on. Caps:
-     `>6` distinct zone names, or `>15` resolved ids ("Torghast" collides with wing sub-maps)
-     → treat as an everywhere-vendor → `global`.
-  3. **Expansion** — the teaching item's `ItemSparse.ExpansionID`.
-  4. **Faction (0/1)** — an `(Alliance)` / `(Horde)` tag in SourceText.
-  5. Everything unresolved + class / PvP / TCG / promotion / shop / trading-post patterns → `global`.
-- `points` / `achievementID` / `repFaction` / `vendor` tables are emitted **empty** — curated in
-  `Overrides.lua` (phase 6). Achievement-reward mounts without a `Zone:` land in `global` for now
-  (the sibling's achievement→zone resolver is not ported yet — future work).
-- Sanity gate (writes nothing if unmet): ≥40 zones, ≥250 refs, ≥150 global, ref count within
-  60–160% of the previous file.
+- **`Mount.SourceTypeEnum` is too noisy to use** (big "Legacy" bucket, `-1` on new mounts) —
+  the generator parses **`Mount.SourceText_lang`** structured labels instead (`Zone:` /
+  `Location:` / `Vendor:` / `Drop:` / `Quest:` / `Faction:` / `Profession:` / `World Event:` /
+  `(Alliance)` / `(Horde)`).
+- Resolution: (1) instance drops via `JournalEncounterItem` -> item teach-spell
+  (`ItemXItemEffect` -> `ItemEffect.SpellID`) -> `Mount.SourceSpellID` ->
+  `JournalInstance.MapID` -> uiMapID; **link verified on 12.1.0.69497** (1674/1680 mounts
+  have a teach item, 67 hit a journal boss). (2) `Zone:` / `Location:` name match against
+  `UiMap.Name_lang` where `Type in {3 Zone, 6 Orphan}`, all name variants kept; caps `>6`
+  distinct names or `>15` ids -> `global`. (3) expansion from `ItemSparse.ExpansionID`.
+  (4) faction from the `(Alliance)`/`(Horde)` tag. (5) everything else -> `global`.
+- `points` / `achievementID` / `repFaction` / `vendor` emitted **empty** — curated in
+  `Overrides.lua`.
+- Sanity gate (writes nothing if unmet): >=40 zones, >=250 refs, >=150 global, ref count
+  within 60-160% of the previous file.
 - **Build 12.1.0.69497 result**: 293 zones, 1846 refs, 692 mounts zone-resolved, 67 instance,
-  988 global. ~41% zone-resolved + honest `global` for the rest — Overrides fills gaps.
-- **DB2 access, 2026-08-30**: wago.tools was unreachable; general internet was down but the
-  **Blizzard CDN (`level3.blizzard.com`) was up**, so `wow.tools.local` (`D:\Propio\GitHub\
-  wow.tools.local`, `_run/config.json` → `wowFolder=E:\Blizzard\World of Warcraft`) ran offline
-  against the local CASC install. Start `_run/wow.tools.local.exe`, wait for `:5000`, then
-  `GET http://localhost:5000/dbc/export/csv?name=<Table>&build=<build>&locale=enUS`. CSVs dropped
-  in `.wago-cache/<build>/` (gitignored); generator run with `--build 12.1.0.69497`.
-- `.github/workflows/refresh-mount-data.yml` — weekly + manual; runs the generator,
-  lua-syntax-checks the output, opens a PR (never auto-merges).
-- `.github/workflows/release.yml` — bumps `## Version:` on a `MountData.lua` change landing
-  on `main` or manual dispatch, tags, runs `BigWigsMods/packager@v2`. CurseForge upload
-  dormant until `## X-Curse-Project-ID:` is in the `.toc` and `CF_API_KEY` secret exists.
+  988 global. Variant-map duplication inflates the zone count (per-expansion copies of the
+  same real zone) — harmless, player is on one map id at a time.
+- **DB2 access, 2026-08-30**: wago.tools + general internet were down but the Blizzard CDN
+  was up, so `wow.tools.local` (`D:\Propio\GitHub\wow.tools.local`, `_run/config.json` ->
+  `wowFolder=E:\Blizzard\World of Warcraft`) ran offline against the local CASC install:
+  start `_run/wow.tools.local.exe`, wait for `:5000`, then
+  `GET http://localhost:5000/dbc/export/csv?name=<Table>&build=<build>&locale=enUS`; drop the
+  CSVs in `.wago-cache/<build>/` (gitignored) and run the generator with `--build`.
 
-## Testing (planned — ported from the sibling)
-- CI = `.github/workflows/ci.yml`, one job per suite on push/PR: `lint` (`luacheck .`),
-  `smoke` (`tests/` headless harness — fake WoW client, drives lifecycle + every `/mtlz`
-  command across `cold`/`warm`), `generator` (`tests/test_generator.py` — pure transforms in
-  `generate_mount_zones.py`), `data` (`tests/test_mountdata.py` + `tests/test_toc.py` — load
-  `MountData.lua`/`Overrides.lua` under a bare Lua state, assert table shapes; `.toc` sanity).
-- Runs on `lupa` (pip). Excluded from luacheck and the packaged addon.
-- **Not a substitute for `/reload`.** [[no-push-until-tested]] stands.
+## Testing (built — phases 3 & 7)
+- `.\run-tests.ps1` runs everything locally; CI = `.github/workflows/ci.yml`, one job per
+  suite on push to main / PR / dispatch:
+  - **lint** — `luacheck .` (11 addon files, `tests/`+`Libs/` excluded).
+  - **smoke** — `python tests/run.py`: `tests/` harness (fake WoW client: `C_MountJournal`,
+    `C_Reputation`, `C_MajorFactions`, `C_CurrencyInfo`, `GetMoney`, tooltip, ScrollBox,
+    Settings, HBD-Pins) loads every addon `.lua` in TOC order and drives the lifecycle +
+    every `/mtlz` command across `cold` (empty journal) and `warm` (1 zone, mounts:
+    one collected, one affordable vendor, one renown-gated; a curated map point). Asserts
+    nothing throws + obtainability states compute + `/mtlz list` names the seeded mount +
+    the Global divider prints. Currently cold 73 / warm 86.
+  - **generator** — `tests/test_generator.py` (35, fixtures only): the pure transforms.
+  - **data** — `tests/test_mountdata.py` (23: MountData / Overrides table shapes) +
+    `tests/test_toc.py` (5: file existence, `## Interface`, SavedVariables vs .luacheckrc,
+    no orphan source, load order).
+- Runs on `lupa` (any Lua 5.x build; `tests/run.py` + `test_mountdata.py` probe for one).
+- **Not a substitute for `/reload`.** [[no-push-until-tested]] stands — see
+  `context/phase8-ingame-checklist.md`.
+
+## CI / release (built — phase 7)
+- `refresh-mount-data.yml` — Tue 09:31 UTC cron + manual dispatch (optional `build`); runs
+  the generator, lua-syntax-checks the output, opens a PR on `chore/refresh-mount-data`
+  touching only `MountData.lua`, never auto-merges. Needs the repo setting **"Allow GitHub
+  Actions to create and approve pull requests"**.
+- `release.yml` — `workflow_run` on a green push-CI on main whose commit changed
+  `MountData.lua`, or manual dispatch (optional exact version). Bumps `## Version:` in the
+  `.toc`, commits `[skip ci]`, tags `vX.Y.Z`, runs `BigWigsMods/packager@v2`. Needs a
+  **`deploy` environment** and (for CurseForge) a **`CF_API_KEY`** secret in it + a
+  `## X-Curse-Project-ID` line in the `.toc` — GitHub Release + zip work without them.
+  First release: manual dispatch, `version = 0.1.0`.
 
 ## Open items / risks
-- Coverage: only ~55-60% of mounts are expected to auto-resolve from DB2; the rest need
-  `Overrides.lua` curation or land in `global`. Acceptable — same shape as the sibling.
-- `JournalInstanceEntrance` positions for instance mounts are a follow-up (the sibling left
-  the equivalent unbuilt).
-- Item→spell→mount linking **verified** on 12.1.0.69497 (see Data pipeline).
-- Variant-map duplication: "293 zones" over-counts — many entries are per-expansion copies of
-  the same real zone (Orgrimmar 85/86, Eversong 94/1267/…). Harmless (player is on exactly one
-  map id at a time) but makes the file bigger and zone counts look odd.
-- Achievement-reward mounts with no `Zone:` currently land in `global`; porting the sibling's
-  achievement→zone resolver would recover ~60 of them.
-- No `X-Curse-Project-ID` until the CurseForge project exists — GitHub release/zip work without it.
+- Coverage ~41% zone-resolved; the rest are honest `global` or need `Overrides` curation.
+- Phase-6 curated coords / the raw-reputation encoding for classic-rep vendors are
+  eyeballed — flagged in `context/phase6-overrides-seed.md` + the phase-8 checklist.
+- Mount-specific APIs are all still **unverified in-game** — see
+  `context/wow-api-reference-cache.md` (GetMountInfoByID tuple order is load-bearing).
+- No `X-Curse-Project-ID` until the CurseForge project exists.

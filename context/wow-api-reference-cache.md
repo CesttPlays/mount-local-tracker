@@ -5,8 +5,60 @@ Source of truth for this repo's addon work. Target build: TOC `## Interface: 120
 Two tiers:
 - **Carried over** — validated in-game in the sibling repo `achivement-local-tracker` and
   reused here unchanged. Trust but re-check on first use in this addon.
-- **Pending** — the mount-specific calls this addon needs. NOT yet validated in-game.
-  Move an entry up to a dated "validated" note once its code path runs clean in the live client.
+- **Pending** — the mount / reputation / currency calls this addon *already uses* (phases
+  1-7) but that are NOT yet validated in-game. Move an entry to a dated "validated" note
+  once its code path runs clean in the live client. See `context/phase8-ingame-checklist.md`.
+
+Everything under PENDING below is wired into shipped code as of phase 7. The load-bearing
+assumption is the `GetMountInfoByID` return-tuple order — a wrong index silently empties or
+mis-colours the whole list. `Obtainability.lua` also assumes field names on
+`C_Reputation.GetFactionDataByID` / `C_MajorFactions.GetMajorFactionData` /
+`C_CurrencyInfo.GetCurrencyInfo` (only exercised once `Overrides` seeds `repFaction` / a
+currency `vendor`, which phase 6 did for ~10 mounts).
+
+---
+
+## PENDING — Reputation / currency / money (Obtainability.lua)
+
+Signatures from warcraft.wiki.gg. All guarded (`type(fn)=="function"` + `pcall`); a missing
+field just yields "unknown" and the mount shows as a plain drop.
+
+### C_Reputation.GetFactionDataByID(factionID) -> FactionData
+- Fields read: `currentStanding`, `currentReactionThreshold`. Classic-rep vendor mounts in
+  `Overrides.repFaction` encode "Exalted" as the raw cumulative value `42000` — verify
+  `currentStanding` is cumulative (not a within-tier delta) on 12.1.
+- `C_Reputation.GetFactionDataByID` replaced the old `GetFactionInfoByID` (index-based).
+
+### C_MajorFactions.GetMajorFactionData(factionID) -> { renownLevel, ... }
+- Field read: `renownLevel`. Renown-gated mounts (`Overrides.repFaction` with a small
+  `standing`, e.g. Dragonscale Expedition `{2507, 25}`) compare against it.
+- `C_MajorFactions.HasMajorFaction(factionID)` to tell a renown faction from a classic one.
+
+### C_CurrencyInfo.GetCurrencyInfo(currencyID) -> { quantity, ... }
+- Field read: `quantity`. For a `vendor` entry with a `currencyID` (Trading Post tender,
+  Riders of Azeroth badges, ...). Gold vendors have `currencyID = nil` and use `GetMoney()`.
+
+### GetMoney() -> copper
+- Player's money in copper. `Overrides.vendor.cost` for gold mounts is in copper.
+
+### GetAchievementInfo(achievementID) -> id, name, points, completed, ...
+- `Obtainability` reads return 4 (`completed`) for `achievementID`-gated mounts, and return 2
+  (`name`) for the tooltip line. Same call the sibling repo validated for achievements.
+
+### C_Spell.GetSpellLink(spellID) -> hyperlink
+- Shift-click-to-chat link for a mount (pass the mount's `spellID`). Fallback `GetSpellLink`.
+
+---
+
+## PENDING — HereBeDragons-Pins-2.0 (Map.lua)
+
+Vendored lib, but the call signatures are assumed from the sibling's Map.lua (achievements)
+and not re-checked for mounts:
+- `HBDPins:AddWorldMapIconMap(ref, pin, uiMapID, x, y, showFlag)` — `showFlag` =
+  `HBD_PINS_WORLDMAP_SHOW_PARENT` (or `1`); returns falsey when the pin can't be placed.
+- `HBDPins:AddMinimapIconMap(ref, pin, uiMapID, x, y, showInParentZone, floatOnEdge)`.
+- `HBDPins:RemoveAllWorldMapIcons(ref)` / `:RemoveAllMinimapIcons(ref)` — `ref` is the addon
+  table, used as the pin-set owner key.
 
 ---
 

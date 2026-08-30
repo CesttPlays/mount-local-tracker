@@ -10,6 +10,8 @@ shape of the shipped `MountData.lua`. It is **not** a substitute for an in-game
 | Lint | `luacheck .` | static analysis of every addon Lua file (config: `.luacheckrc`) |
 | Headless smoke | `python tests/run.py` | the addon loads in TOC order and drives its whole lifecycle + every `/mtlz` command without throwing |
 | Generator | `python -m unittest discover -s tests -p test_generator.py` | the pure transforms in `tools/generate_mount_zones.py` (SourceText parse, zone-name match, instance loot-table join, sanity thresholds, Lua rendering) |
+| Mount data | `python -m unittest discover -s tests -p test_mountdata.py` | loads `MountData.lua` + `Overrides.lua` under a bare Lua state and asserts every table's shape (zone→mountID lists, `source` values, faction ∈ {0,1}, in-range points, `global` never also in a zone, Overrides `lockout`/`vendor`/`repFaction` well-formed) |
+| TOC | `python -m unittest discover -s tests -p test_toc.py` | every `.toc` line exists on disk, `## Interface` is 5-6 digits, `## SavedVariables` is declared in `.luacheckrc`, no orphan `.lua`/`.xml`, load order (Core → MountData → MountModel → Window) |
 
 ## Run
 
@@ -66,3 +68,5 @@ So `no-push-until-tested` still stands.
 - `harness.lua` — reads the `.toc`, loads the addon files, exposes `login()` / `changeZone()` / `collectMount()` / `slash()` / `runTimers()` / …
 - `smoke.lua` — the sequence + checks.
 - `test_generator.py` — unit tests for `tools/generate_mount_zones.py` (fixtures only, no network).
+- `test_mountdata.py` — structural checks on the shipped `MountData.lua` / `Overrides.lua`.
+- `test_toc.py` — `.toc` / packaging consistency.

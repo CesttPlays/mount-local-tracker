@@ -1,0 +1,77 @@
+name: Refresh mount data
+
+# Regenerates Mount_Tracker_Local_Zones/MountData.lua from wago.tools DB2 data
+# -- the per-zone `zones` map plus the flat `global` list (class / racial / PvP /
+# TCG / shop mounts with no single home zone) -- and opens a pull request. Never
+# merges on its own: the diff must be reviewed and the addon validated in-game
+# first.
+
+on:
+  workflow_dispatch:
+    inputs:
+      build:
+        description: "Exact wago.tools build (blank = latest 12.x)"
+        required: false
+        default: ""
+  schedule:
+    - cron: "31 9 * * 2"  # Tuesdays ~09:31 UTC, after the US weekly reset
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Regenerate MountData.lua (zones + global list)
+        env:
+          BUILD_INPUT: ${{ github.event.inputs.build }}
+        run: |
+          if [ -n "$BUILD_INPUT" ]; then
+            python tools/generate_mount_zones.py --build "$BUILD_INPUT"
+          else
+            python tools/generate_mount_zones.py
+          fi
+
+      - name: Lua syntax check
+        run: |
+          sudo apt-get update && sudo apt-get install -y --no-install-recommends lua5.1
+          lua5.1 -e "assert(loadfile('Mount_Tracker_Local_Zones/MountData.lua'))"
+
+      - name: Open pull request
+        uses: peter-evans/create-pull-request@v6
+        with:
+          branch: chore/refresh-mount-data
+          add-paths: Mount_Tracker_Local_Zones/MountData.lua
+          title: "chore: refresh mount data (zones + global)"
+          commit-message: |
+            chore: refresh mount data (zones + global)
+
+            Regenerated from wago.tools DB2 by the refresh-mount-data workflow.
+            Covers the per-zone map and the flat global mount list.
+
+            Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
+          body: |
+            Automated regeneration of `Mount_Tracker_Local_Zones/MountData.lua`
+            from datamined game data -- both the per-zone `zones` map and the flat
+            `global` list (class / racial / PvP / trading-card / shop mounts with
+            no single home zone). Build and entry counts are in the run summary.
+
+            **Before merging:** skim the diff for unexpectedly large swings -- the
+            generator fails the run outright if the zone reference count moves
+            more than ~60% versus the current file, or if fewer than ~150 global
+            mounts / ~250 references / ~40 zones resolve. Then check the addon
+            in-game, including the "Global" divider and a couple of zones you know.
+
+            Curated entries in `Overrides.lua` (rare-drop coords, lockouts, vendor
+            costs) are untouched by this workflow.
+
+            🤖 Generated with [Claude Code](https://claude.com/claude-code)
+          labels: automated

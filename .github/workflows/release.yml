@@ -1,0 +1,151 @@
+name: Release
+
+# Packages the addon with the BigWigs packager (fetches Libs per .pkgmeta,
+# builds the zip, creates a GitHub Release, and -- once CF_API_KEY + the
+# ## X-Curse-Project-ID TOC line are in place -- uploads to CurseForge).
+#
+# Triggers:
+#   1. A *successful* CI run on main whose triggering push changed MountData.lua.
+#      refresh-mount-data.yml opens a PR that only touches MountData.lua when the
+#      datamined data actually moved, so merging that PR (after the in-game
+#      check) is the release signal -- but the release waits for CI to be green
+#      on the merge commit rather than running in parallel with it.
+#   2. Manual dispatch, with an optional exact version (blank = bump the patch).
+#
+# Each run rewrites `## Version:` in the .toc to X.Y.Z, commits it to main with
+# [skip ci] (CI does not run on the bump, so no CI-completed event fires and
+# this workflow does not re-trigger), tags vX.Y.Z, and runs the packager.
+#
+# Note: if CI fails on the merge commit, no release fires. Push the fix; if that
+# commit also touches MountData.lua the release fires on its green CI run,
+# otherwise re-release via manual dispatch.
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Exact version to release, e.g. 0.2.0 (blank = bump patch: 0.1.0 -> 0.1.1)"
+        required: false
+        default: ""
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  # One place decides whether a release should happen: manual dispatch always
+  # proceeds; a CI-completed event proceeds only when it was a successful,
+  # push-triggered CI run on main whose push actually moved MountData.lua.
+  gate:
+    runs-on: ubuntu-latest
+    outputs:
+      proceed: ${{ steps.check.outputs.proceed }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.workflow_run.head_sha || github.ref }}
+
+      - name: Decide whether to release
+        id: check
+        env:
+          EVENT: ${{ github.event_name }}
+          CI_CONCLUSION: ${{ github.event.workflow_run.conclusion }}
+          CI_EVENT: ${{ github.event.workflow_run.event }}
+          CI_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          set -euo pipefail
+          if [ "$EVENT" = workflow_dispatch ]; then
+            echo "manual dispatch -> release"
+            echo "proceed=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if [ "$CI_CONCLUSION" != success ] || [ "$CI_EVENT" != push ]; then
+            echo "CI run was '$CI_CONCLUSION' from '$CI_EVENT' -> skip"
+            echo "proceed=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if git diff --name-only "${CI_SHA}^" "$CI_SHA" \
+              | grep -qx 'Mount_Tracker_Local_Zones/MountData.lua'; then
+            echo "MountData.lua changed in $CI_SHA -> release"
+            echo "proceed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "no MountData.lua change in $CI_SHA -> skip"
+            echo "proceed=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  release:
+    needs: gate
+    if: needs.gate.outputs.proceed == 'true'
+    runs-on: ubuntu-latest
+    # CF_API_KEY lives in the "deploy" environment; the job must target it to
+    # read the secret (and to honour any environment protection rules).
+    environment: deploy
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.workflow_run.head_sha || github.ref }}
+
+      - name: Compute release version
+        id: ver
+        env:
+          INPUT_VERSION: ${{ github.event.inputs.version }}
+        run: |
+          set -euo pipefail
+          TOC="Mount_Tracker_Local_Zones/Mount_Tracker_Local_Zones.toc"
+          current="$(grep -oP '^## Version:\s*\K[0-9.]+' "$TOC")"
+          echo "current TOC version: ${current}"
+          if [ -n "${INPUT_VERSION}" ]; then
+            next="${INPUT_VERSION}"
+          else
+            IFS='.' read -r major minor patch <<< "${current}"
+            next="${major:-0}.${minor:-0}.$(( ${patch:-0} + 1 ))"
+          fi
+          if ! printf '%s' "${next}" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "::error::computed version '${next}' is not X.Y.Z"
+            exit 1
+          fi
+          if git rev-parse -q --verify "refs/tags/v${next}" >/dev/null; then
+            echo "::error::tag v${next} already exists"
+            exit 1
+          fi
+          echo "version=${next}" >> "$GITHUB_OUTPUT"
+          echo "toc=${TOC}" >> "$GITHUB_OUTPUT"
+          echo "Releasing v${next}"
+
+      - name: Bump TOC, commit, tag
+        env:
+          VERSION: ${{ steps.ver.outputs.version }}
+          TOC: ${{ steps.ver.outputs.toc }}
+        run: |
+          set -euo pipefail
+          sed -i -E "s/^## Version:.*/## Version: ${VERSION}/" "${TOC}"
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if git diff --quiet -- "${TOC}"; then
+            echo "TOC already at ${VERSION}; tagging existing HEAD"
+          else
+            git add "${TOC}"
+            git commit -m "release: v${VERSION} [skip ci]"
+            git push origin HEAD:main
+          fi
+          git tag "v${VERSION}"
+          git push origin "v${VERSION}"
+
+      - name: Package and release
+        uses: BigWigsMods/packager@v2
+        env:
+          # packager reads GITHUB_OAUTH (not GITHUB_TOKEN) for the GitHub Release
+          GITHUB_OAUTH: ${{ secrets.GITHUB_TOKEN }}
+          # CurseForge: project id is ## X-Curse-Project-ID in the .toc;
+          # CF_API_KEY is an environment secret (environment: deploy above)
+          CF_API_KEY: ${{ secrets.CF_API_KEY }}
+          # WOWI_API_TOKEN: ${{ secrets.WOWI_API_TOKEN }}

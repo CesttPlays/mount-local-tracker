@@ -1,11 +1,11 @@
 # Mount Tracker: Local Zones
+[![Release](https://github.com/CesttPlays/mount-local-tracker/actions/workflows/release.yml/badge.svg?branch=main)](https://github.com/CesttPlays/mount-local-tracker/actions/workflows/release.yml) [![CI](https://github.com/CesttPlays/mount-local-tracker/actions/workflows/ci.yml/badge.svg)](https://github.com/CesttPlays/mount-local-tracker/actions/workflows/ci.yml)
 
 Shows the mounts you can still collect **in the zone you're standing in** — and
 whether you can actually get them right now.
 
-> **Status:** early development. The skeleton (saved variables, slash commands,
-> event wiring) is in place; the zone data, tracker window, obtainability engine
-> and map pins are being built phase by phase. Not yet released.
+> **Status:** feature-complete, pending its first in-game validation pass and
+> release. The bundled zone data set is partial and improving each patch.
 
 ## What it does
 
