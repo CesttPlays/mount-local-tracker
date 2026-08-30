@@ -30,7 +30,12 @@
    `tests/` smoke harness ported: `python tests/run.py` → cold 55/55, warm 62/62, exit 0.
    luacheck green (8 files). Notes for phase-8 in-game check: verify `GetMountInfoByID` tuple
    order, `GameTooltip:SetMountBySpellID`, ScrollBox API, stylized summary-line layout.
-4. **Config + MinimapButton** — Settings panel incl. the `groupBy` dropdown; minimap launcher.
+4. **Config + MinimapButton** — DONE. `Config.lua`: Settings API panel (Window / Mount list /
+   Filter by source / Map & minimap) + "Hidden mounts" canvas subcategory (bucketed by source).
+   "Filter by source" checkboxes read "Show X" but store the inverted `db.hiddenSources[type]`
+   via a metatable proxy. `MinimapButton.lua`: LDB + LibDBIcon launcher. Smoke: cold 67/67,
+   warm 74/74; luacheck 10 files. Phase-8 check: 11.0.2 `RegisterAddOnSetting` signature, the
+   proxy-table binding (rawget/rawset risk), canvas subcategory, minimap clicks.
 5. **Map** — world-map + minimap pins for positioned uncollected mounts.
 6. **Overrides.lua seed** — ~25 well-known curated rare-drop / vendor mounts with coords.
 7. **tests/ full port + CI + release workflows + context/ refresh** —

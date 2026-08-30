@@ -21,6 +21,8 @@ MountModel.lua
 ListView.xml
 ListView.lua
 Window.lua
+Config.lua
+MinimapButton.lua
 
 #@do-not-package@
 Mechanic.lua

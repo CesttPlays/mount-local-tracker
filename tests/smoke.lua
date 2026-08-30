@@ -48,6 +48,7 @@ for _, key in ipairs({
     "MountData", "MountOverrides", "MountInfo", "BindMount",
     "InitializeWindow", "ToggleWindow", "RefreshWindow", "PrintZoneList",
     "IsWindowShown", "ResetWindow", "defaults",
+    "SetupConfig", "OpenConfig", "SetupMinimapButton", "ApplyMinimapButton",
 }) do
     check("addon." .. key .. " is defined", addon[key] ~= nil)
 end
@@ -144,6 +145,44 @@ end
 
 check("a slash command produced chat output",
     #Harness.getPrints() > 0, "nothing was printed by any command")
+
+-- ---------------------------------------------------------------------------
+-- Options panel + minimap button (Config.lua / MinimapButton.lua)
+-- ---------------------------------------------------------------------------
+check("/mtlz config opened the options panel", Stub.data.openedCategory ~= nil,
+    "Settings.OpenToCategory was never called")
+
+step("toggle list settings through the panel, refresh", function()
+    local s = Stub.data.settings
+    if s.groupBy then s.groupBy.set("expansion") end
+    if s.showCollected then s.showCollected.set(true) end
+    addon.RefreshWindow()
+    Harness.runTimers()
+    if s.groupBy then s.groupBy.set("source") end
+    if s.showCollected then s.showCollected.set(false) end
+    addon.RefreshWindow()
+end)
+
+step("Filter by source: unchecking 'Show Vendor' hides vendor mounts", function()
+    local binding = Stub.data.settings.show_vendor
+    check("the 'Show Vendor' checkbox is bound", binding ~= nil)
+    if binding then
+        check("it reads as checked by default", binding.get() == true)
+        binding.set(false)
+        check("db.hiddenSources.vendor is now set", addon.db.hiddenSources.vendor == true)
+        binding.set(true)
+        check("db.hiddenSources.vendor cleared again", addon.db.hiddenSources.vendor == nil)
+    end
+    addon.RefreshWindow()
+    Harness.runTimers()
+end)
+
+step("minimap button toggle (ApplyMinimapButton both ways)", function()
+    addon.db.showMinimapButton = false
+    addon.ApplyMinimapButton()
+    addon.db.showMinimapButton = true
+    addon.ApplyMinimapButton()
+end)
 
 if SCENARIO == "warm" then
     local named = false

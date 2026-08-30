@@ -175,6 +175,8 @@ local D = {
     currencies = {},     -- [currencyID] = { quantity= }
     questsCompleted = {}, -- [questID] = true
     achievements = {},   -- [achID] = { name=, completed= }
+    openedCategory = nil, -- last Settings.OpenToCategory argument
+    settings = {},       -- [variableKey] = { get=, set=, fireChanged= } (options panel bindings)
 }
 Stub.data = D
 
@@ -303,8 +305,32 @@ function Stub.install()
         RegisterVerticalLayoutCategory = function(name)
             return { GetID = function() return 1 end, name = name }, { AddInitializer = noop }
         end,
-        RegisterAddOnSetting = function()
-            return { SetValueChangedCallback = noop }
+        -- Write-through so a proxy-table-bound setting (the "Filter by source"
+        -- checkboxes) actually flips db.hiddenSources when a test drives it. The
+        -- binding is also recorded in Stub.data.settings so a test can toggle it.
+        RegisterAddOnSetting = function(_, _, key, tbl, _, _, default)
+            if tbl and key ~= nil and tbl[key] == nil then
+                tbl[key] = default
+            end
+            local onChanged
+            local setting = {
+                SetValueChangedCallback = function(_, fn) onChanged = fn end,
+                GetValue = function() return tbl and key ~= nil and tbl[key] end,
+                SetValue = function(_, v)
+                    if tbl and key ~= nil then tbl[key] = v end
+                    if onChanged then onChanged() end
+                end,
+            }
+            if key ~= nil then
+                D.settings[key] = {
+                    get = function() return tbl and tbl[key] end,
+                    set = function(v)
+                        if tbl then tbl[key] = v end
+                        if onChanged then onChanged() end
+                    end,
+                }
+            end
+            return setting
         end,
         CreateCheckbox = noop,
         CreateDropdown = noop,
@@ -315,7 +341,7 @@ function Stub.install()
             return { Add = noop, GetData = function() return {} end }
         end,
         RegisterAddOnCategory = noop,
-        OpenToCategory = noop,
+        OpenToCategory = function(id) D.openedCategory = id end,
     }
 
     -- LibStub + just enough of the embedded libs that Map / MinimapButton run
