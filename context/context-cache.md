@@ -81,22 +81,43 @@ Files loaded in TOC order:
   LibDBIcon-1.0. Vendored; LibStub/CallbackHandler/LibDBIcon committed, the rest fetched by
   the BigWigs packager (`.pkgmeta`).
 
-## Data pipeline (planned)
-- `tools/generate_mount_zones.py` (stdlib only) pulls wago.tools DB2 CSVs. Resolution:
-  1. **Instance drops** — `JournalEncounterItem.ItemID` → item teaches spell
-     (`ItemEffect`/`ItemXItemEffect` → `SpellName`) → match `Mount.SourceSpellID`;
+## Data pipeline (built — phase 2, 2026-08-30)
+- `tools/generate_mount_zones.py` (stdlib only) pulls wago.tools DB2 CSVs (`--locale enUS`).
+  Tables: Mount, SpellName, ItemEffect, ItemXItemEffect, ItemSparse, JournalEncounterItem,
+  JournalEncounter, JournalInstance, Map, UiMap, UiMapAssignment.
+- **`Mount.SourceTypeEnum` is unreliable** (huge "Legacy" bucket, `-1` on new mounts) — the
+  generator parses **`Mount.SourceText_lang`** instead, which carries structured labels:
+  `Zone:` / `Location:` (→ the zone name, may be a comma list), `Vendor:`, `Drop:`, `Quest:`,
+  `Faction:`, `Profession:`, `World Event:`, `Cost:` + `|Hcurrency:ID|`, `(Alliance)`/`(Horde)`.
+- Resolution, per mount:
+  1. **Instance drops** — `JournalEncounterItem.ItemID` → the item's teach-spell
+     (`ItemXItemEffect` → `ItemEffect.SpellID`) → `Mount.SourceSpellID`; then
      `JournalEncounter.JournalInstanceID` → `JournalInstance.MapID` → `UiMapAssignment` → uiMapID.
-  2. **Achievement-reward mounts** — reuse the achievement→zone resolver logic ported from
-     the sibling's `generate_zone_achievements.py`.
-  3. **`Mount.SourceText_lang` zone-name parse** (enUS build) — substring-match against
-     zone-type `UiMap.Name_lang`, gated like the sibling's category-name fallback.
-  4. **Faction / expansion** — best-effort from `Mount` + item `ExpansionID` / instance tier.
-  5. Unresolved + class/racial/PvP/store/profession patterns → `global`.
-- Writes nothing on sanity-check failure (min zones mapped, min mount refs), same as the sibling.
-- **wago.tools outage fallback**: same as the sibling repo — extract DB2 CSVs locally with
-  Marlamin's `wow.tools.local` (at `D:\Propio\GitHub\wow.tools.local`), drop into
-  `.wago-cache/<build>/`, run the generator with `--build <build>`. See the sibling's
-  `context/context-cache.md` for the exact `_run/config.json` settings.
+     `source="instance"`, `subcat` dungeon/raid from `Map.InstanceType` (1/2). **Verified: the
+     item→spell→mount link resolves — 1674/1680 mounts have a teach item, 67 hit a journal boss.**
+     A journal-boss hit wins outright (no SourceText name match layered on top).
+  2. **`Zone:` / `Location:` name parse** — matched against `UiMap.Name_lang` where
+     `UiMap.Type ∈ {3 Zone, 6 Orphan}` (cities + BGs; **not** 4 Dungeon / 5 Micro). Every
+     name→uiMapID variant is kept (WoW keeps a fresh UI map per expansion/phase, e.g. "Eversong
+     Woods" = 5 ids) so the runtime lookup hits whatever map the player is on. Caps:
+     `>6` distinct zone names, or `>15` resolved ids ("Torghast" collides with wing sub-maps)
+     → treat as an everywhere-vendor → `global`.
+  3. **Expansion** — the teaching item's `ItemSparse.ExpansionID`.
+  4. **Faction (0/1)** — an `(Alliance)` / `(Horde)` tag in SourceText.
+  5. Everything unresolved + class / PvP / TCG / promotion / shop / trading-post patterns → `global`.
+- `points` / `achievementID` / `repFaction` / `vendor` tables are emitted **empty** — curated in
+  `Overrides.lua` (phase 6). Achievement-reward mounts without a `Zone:` land in `global` for now
+  (the sibling's achievement→zone resolver is not ported yet — future work).
+- Sanity gate (writes nothing if unmet): ≥40 zones, ≥250 refs, ≥150 global, ref count within
+  60–160% of the previous file.
+- **Build 12.1.0.69497 result**: 293 zones, 1846 refs, 692 mounts zone-resolved, 67 instance,
+  988 global. ~41% zone-resolved + honest `global` for the rest — Overrides fills gaps.
+- **DB2 access, 2026-08-30**: wago.tools was unreachable; general internet was down but the
+  **Blizzard CDN (`level3.blizzard.com`) was up**, so `wow.tools.local` (`D:\Propio\GitHub\
+  wow.tools.local`, `_run/config.json` → `wowFolder=E:\Blizzard\World of Warcraft`) ran offline
+  against the local CASC install. Start `_run/wow.tools.local.exe`, wait for `:5000`, then
+  `GET http://localhost:5000/dbc/export/csv?name=<Table>&build=<build>&locale=enUS`. CSVs dropped
+  in `.wago-cache/<build>/` (gitignored); generator run with `--build 12.1.0.69497`.
 - `.github/workflows/refresh-mount-data.yml` — weekly + manual; runs the generator,
   lua-syntax-checks the output, opens a PR (never auto-merges).
 - `.github/workflows/release.yml` — bumps `## Version:` on a `MountData.lua` change landing
@@ -117,6 +138,10 @@ Files loaded in TOC order:
   `Overrides.lua` curation or land in `global`. Acceptable — same shape as the sibling.
 - `JournalInstanceEntrance` positions for instance mounts are a follow-up (the sibling left
   the equivalent unbuilt).
-- Item→spell→mount linking (`ItemEffect`/`ItemXItemEffect` schema) is unverified against the
-  current build — first generator task is to confirm those tables resolve.
+- Item→spell→mount linking **verified** on 12.1.0.69497 (see Data pipeline).
+- Variant-map duplication: "293 zones" over-counts — many entries are per-expansion copies of
+  the same real zone (Orgrimmar 85/86, Eversong 94/1267/…). Harmless (player is on exactly one
+  map id at a time) but makes the file bigger and zone counts look odd.
+- Achievement-reward mounts with no `Zone:` currently land in `global`; porting the sibling's
+  achievement→zone resolver would recover ~60 of them.
 - No `X-Curse-Project-ID` until the CurseForge project exists — GitHub release/zip work without it.

@@ -16,10 +16,11 @@
    stub, `Mechanic.lua` (do-not-package dev hub), `Libs/` copied from the sibling repo,
    `.luacheckrc`, `.pkgmeta`, `LICENSE` (MIT), real `README.md`, `.gitignore` +
    `libs.json` path fixups, `run-tests.ps1`. `luacheck .` green. Pending in-game check.
-2. **Generator v1** — `tools/generate_mount_zones.py`: instance-drop pass +
-   `Mount.SourceText_lang` zone parse + `global` bucket. Confirm the
-   item→spell→`Mount.SourceSpellID` link resolves against the current build first.
-   Run it, commit the generated `MountData.lua`. Add `tests/test_generator.py`.
+2. **Generator v1** — DONE. `tools/generate_mount_zones.py` (instance loot-table pass +
+   `SourceText_lang` `Zone:`/`Location:` parse + `global` bucket; enum ignored). Item→spell→
+   mount link verified on 12.1.0.69497. `MountData.lua` regenerated (293 zones / 1846 refs /
+   988 global). `tests/test_generator.py` — 35 tests green. luacheck green. See context-cache.md
+   "Data pipeline" for the offline `wow.tools.local` DB2 procedure.
 3. **MountModel + ListView + Window** — zone → grouped uncollected mounts, the tracker
    window. Done when `python tests/run.py` (smoke) is green.
 4. **Config + MinimapButton** — Settings panel incl. the `groupBy` dropdown; minimap launcher.
