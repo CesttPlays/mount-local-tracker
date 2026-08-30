@@ -41,7 +41,13 @@
    `MountData.points` is empty so **no pins until Overrides.points is seeded (phase 6)**.
    Smoke: cold 70/70, warm 83/83 (warm seeds a curated point → asserts a pin is placed);
    luacheck 11 files. Phase-8 check: HBD-Pins API arg order on 12.1, pins clear on collect.
-6. **Overrides.lua seed** — ~25 well-known curated rare-drop / vendor mounts with coords.
+6. **Overrides.lua seed** — DONE. ~30 mounts: 7 rare-drop pins (Time-Lost Proto-Drake,
+   Aeonaxx, Long-Forgotten Hippogryph, Poseidus, Solar Spirehawk, Voidtalon, Heavenly Onyx
+   Cloud Serpent), 18 daily/weekly instance-farm lockouts + 24 drop chances, 7 gold/currency
+   vendors, 5 repFaction, 3 `add` (zones the generator missed). Every mountID/uiMapID grepped
+   from the DB2 cache. Smoke: cold 73/73, warm 86/86; luacheck 11 files. `context/phase6-
+   overrides-seed.md` lists the low-confidence entries (coords, rep-value semantics) for the
+   phase-8 in-game spot-check.
 7. **tests/ full port + CI + release workflows + context/ refresh** —
    `tests/{run,stub,smoke,init,harness}.lua`, `tests/test_*.py`, `run-tests.ps1`,
    `.github/workflows/{ci,refresh-mount-data,release}.yml`.

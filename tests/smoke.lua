@@ -164,6 +164,20 @@ if SCENARIO == "warm" then
     end)
 end
 
+-- The shipped Overrides.lua seed (real mount ids), independent of the scenario.
+step("obtainability reads the Overrides seed", function()
+    -- 168 Fiery Warhorse: lockout = "weekly", no lockout quest -> farmable.
+    local farm = addon.Obtainability.Evaluate(168, { isCollected = false, source = "instance" })
+    check("weekly-lockout mount -> 'farmable'", farm.state == "farmable", farm.state)
+
+    -- 236 Winged Steed of the Ebon Blade: gold vendor, ~1000g. Rich player -> available.
+    local before = Stub.data.money
+    Stub.data.money = 5000 * 10000 * 100
+    local buy = addon.Obtainability.Evaluate(236, { isCollected = false, source = "vendor" })
+    Stub.data.money = before
+    check("affordable Overrides vendor mount -> 'available'", buy.state == "available", buy.state)
+end)
+
 -- ---------------------------------------------------------------------------
 -- Slash commands
 -- ---------------------------------------------------------------------------
