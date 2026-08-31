@@ -217,8 +217,12 @@ local function PointFor(mountID)
 	return type(point) == "table" and point or nil
 end
 
--- { id, name, spellID, icon, isUsable, isCollected, source, subcat, expansion,
---   state, detail, sortRank, point } or nil when the mount is filtered out.
+-- Always returns a row for a real mount id; nil only when the id isn't a real /
+-- not-yet-loaded mount. row.include is the boolean "list this row" verdict --
+-- callers that only want the listed rows check it, while the zone summary folds
+-- over every row so collected / hidden mounts still count toward the zone totals.
+-- row = { id, name, spellID, icon, isUsable, isCollected, source, subcat,
+--         expansion, state, detail, sortRank, point, include }
 local function BuildRow(mountID)
 	local name, spellID, icon, _, isUsable, _, _, _, _, _, isCollected =
 		addon.MountInfo(mountID)
@@ -228,30 +232,17 @@ local function BuildRow(mountID)
 	end
 
 	local db = addon.db or EMPTY
-
-	if isCollected and not db.showCollected then
-		return nil
-	end
-	if db.hidden and db.hidden[mountID] then
-		return nil
-	end
-
 	local source = Curated("source", mountID) or "other"
-	if db.hiddenSources and db.hiddenSources[source] then
-		return nil
-	end
 
-	-- Faction-specific mounts: hide the other faction's version.
+	-- Faction-specific mounts: the other faction's version is filtered from the
+	-- list (but still counted in the zone total).
+	local factionOK = true
 	local requiredFaction = Curated("faction", mountID)
 	if requiredFaction ~= nil then
 		local playerFaction = PlayerFactionIndex()
 		if playerFaction ~= nil and playerFaction ~= requiredFaction then
-			return nil
+			factionOK = false
 		end
-	end
-
-	if isUsable == false and not db.showUnusable then
-		return nil
 	end
 
 	local row = {
@@ -281,14 +272,32 @@ local function BuildRow(mountID)
 	row.detail = verdict.detail
 	row.sortRank = verdict.sortRank
 
-	if db.showObtainableOnly and not (row.isCollected or OBTAINABLE[row.state]) then
-		return nil
-	end
+	-- Count everything; list only what passes every active filter.
+	row.include = (db.showCollected or not row.isCollected)
+		and not (db.hidden and db.hidden[mountID])
+		and not (db.hiddenSources and db.hiddenSources[source])
+		and (db.showUnusable or row.isUsable)
+		and (row.isCollected or not db.showObtainableOnly or OBTAINABLE[row.state])
+		and factionOK or false
 
 	return row
 end
 
 MountModel.BuildRow = BuildRow
+
+-- Build a row for every id in a candidate list, dropping ids that aren't real
+-- mounts. Feeds both GroupRows (which lists the row.include rows) and the zone
+-- summary fold (which counts them all).
+local function BuildRows(ids)
+	local rows = {}
+	for _, mountID in ipairs(ids) do
+		local row = BuildRow(mountID)
+		if row then
+			rows[#rows + 1] = row
+		end
+	end
+	return rows
+end
 
 -- ============================================================================
 -- Grouping
@@ -316,13 +325,14 @@ local function FinishGroup(group)
 	end
 end
 
--- ids -> array of { key, label, icon, rows, total, collected, available, isGlobal }.
-local function GroupRows(ids, groupBy, isGlobal)
+-- Pre-built rows -> array of
+-- { key, label, icon, rows, total, collected, available, isGlobal }.
+-- Rows with include == false are skipped here (the zone summary still counts them).
+local function GroupRows(rows, groupBy, isGlobal)
 	local groups, byKey = {}, {}
 
-	for _, mountID in ipairs(ids) do
-		local row = BuildRow(mountID)
-		if row then
+	for _, row in ipairs(rows) do
+		if row.include then
 			local key, label, rank
 			if groupBy == "expansion" then
 				key, label, rank = ExpansionBucket(row.expansion)
@@ -419,29 +429,6 @@ local function hiddenSourcesHash()
 	return table.concat(keys, ",")
 end
 
--- Count total / collected / available across a flat candidate id list, for the
--- window summary line. Collected mounts are counted even when the list filters
--- them out.
-local function ZoneTally(ids)
-	local total, collected, available = 0, 0, 0
-	for _, mountID in ipairs(ids) do
-		local name, _, _, _, _, _, _, _, _, _, isCollected = addon.MountInfo(mountID)
-		if type(name) == "string" and name ~= "" then
-			total = total + 1
-			if isCollected then
-				collected = collected + 1
-			else
-				local verdict = Obtainability
-					and Obtainability.Evaluate(mountID, { isCollected = false, source = Curated("source", mountID) })
-				if verdict and verdict.state == "available" then
-					available = available + 1
-				end
-			end
-		end
-	end
-	return total, collected, available
-end
-
 -- Returns: groups, zoneName, mapID.
 function MountModel.GetZoneMounts()
 	local zoneName = addon.GetCurrentLocationName()
@@ -464,9 +451,20 @@ function MountModel.GetZoneMounts()
 	end
 
 	local ids = CandidateSet(GetMapChain(mapID))
-	local groups = GroupRows(ids, groupBy, false)
+	local rows = BuildRows(ids)
+	local groups = GroupRows(rows, groupBy, false)
 
-	local zoneTotal, zoneCollected, zoneAvailable = ZoneTally(ids)
+	-- Zone summary: fold over every real row, filters or not. Collected / hidden /
+	-- filtered mounts still count toward the zone totals.
+	local zoneTotal, zoneCollected, zoneAvailable = 0, 0, 0
+	for _, row in ipairs(rows) do
+		zoneTotal = zoneTotal + 1
+		if row.isCollected then
+			zoneCollected = zoneCollected + 1
+		elseif row.state == "available" then
+			zoneAvailable = zoneAvailable + 1
+		end
+	end
 
 	if db.showGlobal then
 		local shown = {}
@@ -479,7 +477,7 @@ function MountModel.GetZoneMounts()
 				globalIDs[#globalIDs + 1] = id
 			end
 		end
-		for _, group in ipairs(GroupRows(globalIDs, groupBy, true)) do
+		for _, group in ipairs(GroupRows(BuildRows(globalIDs), groupBy, true)) do
 			groups[#groups + 1] = group
 		end
 	end

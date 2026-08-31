@@ -49,7 +49,9 @@ local function Compute()
 		seen[mountID] = true
 
 		local row = MountModel.BuildRow(mountID)
-		if not row or row.isCollected or row.state == "collected" or not row.point then
+		-- row.include folds in hidden / hiddenSources / unusable / faction /
+		-- obtainable-only / show-collected -- Map respects all of them now.
+		if not row or not row.include or row.isCollected or not row.point then
 			return
 		end
 

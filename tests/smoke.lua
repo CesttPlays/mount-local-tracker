@@ -278,6 +278,41 @@ step("source model: Config registers one source filter per SOURCE_ORDER entry", 
         filterCount == #order)
 end)
 
+-- ---------------------------------------------------------------------------
+-- WS6: single-pass zone scan -- zone tally is filter-independent
+-- ---------------------------------------------------------------------------
+if SCENARIO == "warm" then
+    step("zone tally: zoneTotal / zoneCollected survive a showCollected flip", function()
+        -- warm fixture zone 84 (Stormwind City): stubbed zone mounts are
+        -- 9 (collected), 11 (uncollected, affordable vendor), 18 (uncollected,
+        -- rep-gated). Toggling "show collected" changes which rows list, never
+        -- the zone totals.
+        local model = addon.MountModel
+        Stub.data.zone, Stub.data.mapID = "Stormwind City", 84
+
+        addon.db.showCollected = false
+        model.InvalidateCache()
+        model.GetZoneMounts()
+        local off = model.Summary()
+
+        addon.db.showCollected = true
+        model.InvalidateCache()
+        model.GetZoneMounts()
+        local on = model.Summary()
+
+        addon.db.showCollected = false
+        model.InvalidateCache()
+
+        check(("zoneTotal equal across the flip (off=%s on=%s)")
+            :format(tostring(off.zoneTotal), tostring(on.zoneTotal)),
+            off.zoneTotal == on.zoneTotal and off.zoneTotal > 0)
+        check(("zoneCollected equal across the flip (off=%s on=%s)")
+            :format(tostring(off.zoneCollected), tostring(on.zoneCollected)),
+            off.zoneCollected == on.zoneCollected)
+        check("fixture zone counts at least one collected mount", on.zoneCollected >= 1)
+    end)
+end
+
 step("minimap button toggle (ApplyMinimapButton both ways)", function()
     addon.db.showMinimapButton = false
     addon.ApplyMinimapButton()
