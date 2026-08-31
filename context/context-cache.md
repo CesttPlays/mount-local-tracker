@@ -13,9 +13,12 @@
   place of achievements.
 - Solo developer, new to Lua and the WoW API, plans to publish (CurseForge/WoWInterface).
   Release-quality; no debug spam on by default.
-- Status: **phases 1-7 built on branch `phase-buildout`**, all green offline. Not yet
-  validated in-game, not merged to `main`, not released. Plan approved 2026-08-30.
-- Last updated: 2026-08-30
+- Status: **phases 1-7 merged to `main`** (PR #1 vendor waypoints included; stale
+  `phase-buildout` / `feat/vendor-waypoints` branches deleted), all green offline. Loads in
+  the live client (SavedVariables written 2026-08-30) but the phase-8 in-game checklist
+  (A-G) is NOT done and the WoW API assumptions are still unverified. Not released — no tag,
+  no GitHub Release, TOC at default `0.1.0`. Plan approved 2026-08-30.
+- Last updated: 2026-08-31
 
 ## Locked decisions (2026-08-30)
 - **Addon folder**: `Mount_Tracker_Local_Zones/` (spelled correctly). **SavedVariables**:

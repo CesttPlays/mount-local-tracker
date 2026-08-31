@@ -8,8 +8,8 @@ assumed, that frames lay out, or that the curated data is right.
 `E:\Blizzard\World of Warcraft\_retail_\Interface\AddOns\Mount_Tracker_Local_Zones\`,
 then `/reload`. Re-run `.\run-tests.ps1` after every fix.
 
-When it all passes: update `context/`, merge `phase-buildout` -> `main`, then
-manual-dispatch `release.yml` with `version = 0.1.0`.
+Phases 1-7 are already on `main`. When it all passes: update `context/` in the same
+commit, then manual-dispatch `release.yml` with `version = 0.1.0`.
 
 ---
 
