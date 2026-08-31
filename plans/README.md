@@ -32,7 +32,9 @@ behaviour lists an explicit in-game check for the maintainer.
 | 002 | Add a direct unit-test suite for the obtainability engine | P1 | M | — | DONE (tests/test_obtainability.py, 27 tests; wired into CI `data` job; branch worktree-execute-plans) |
 | 003 | Pre-filter `Map.Compute` to positioned mounts only | P2 | S | — | DONE (branch worktree-execute-plans; offline suites green; needs in-game check) |
 | 004 | Doc + small-debt cleanup (phase-9 status, `GetCurrentMapID` dup, account-count scan) | P2 | S | — | DONE (branch worktree-execute-plans; offline suites green; needs in-game check) |
-| 005 | SPIKE: achievement-reward → zone resolver for `global` mounts | P3 | L | — | TODO |
+| 005 | SPIKE: achievement-reward → zone resolver for `global` mounts | P3 | L | — | DONE (findings: `context/spike-achievement-resolver.md`; scratch script `tools/_spike_ach_resolve.py`; spawned 006/007) |
+| 006 | STUB: achievement→zone + `achievementID` branch in the mount generator | P3 | M | 005 | TODO (unblocked by spike 005) |
+| 007 | STUB: document `Overrides.achievementID` + seed residual cases | P3 | S | 005 | TODO (unblocked by spike 005) |
 
 Status values: TODO | IN PROGRESS | DONE | BLOCKED (one-line reason) | REJECTED (one-line rationale)
 
@@ -45,7 +47,11 @@ Status values: TODO | IN PROGRESS | DONE | BLOCKED (one-line reason) | REJECTED 
 - 004's three sub-changes are independent of each other; they are bundled only
   because each is a few lines. An executor may land them as one commit or three.
 - 005 is a design/spike plan — its deliverable is a findings write-up + a
-  prototype branch, not shipped code. It will spawn follow-up build plans.
+  prototype branch, not shipped code. It spawned plans 006 and 007.
+- 006 and 007 both depend on the spike-005 findings. 006 is the generator build
+  (its two deliverables — `achievementID` for ~180 mounts, zone for ~24 — can
+  ship separately). 007 is the docs + hand-curation companion; it can land before
+  or after 006. Neither is fully specified yet — flesh out from the stubs first.
 
 ## Findings considered and rejected
 
