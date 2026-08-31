@@ -33,11 +33,41 @@ function Map.Invalidate()
 	registered = false
 end
 
+-- Only mounts with a curated position can ever produce a pin: a `points` entry,
+-- or (when db.showVendorIcons) a `vendor` entry that carries coordinates. BuildRow
+-- still does the real filtering (row.include / collected / point); this just spares
+-- it ~1800 calls for mounts that could never be pinned anyway. Keep the id sources
+-- here in sync with BuildRow's row.point logic (MountModel.lua).
+local function PositionedCandidates()
+	local ids, seen = {}, {}
+	local function add(tbl)
+		if type(tbl) ~= "table" then
+			return
+		end
+		for mountID in pairs(tbl) do
+			if not seen[mountID] then
+				seen[mountID] = true
+				ids[#ids + 1] = mountID
+			end
+		end
+	end
+
+	local md = addon.MountData or {}
+	local ov = addon.MountOverrides or {}
+	add(md.points)
+	add(ov.points)
+	if addon.db and addon.db.showVendorIcons then
+		add(md.vendor)
+		add(ov.vendor)
+	end
+	return ids
+end
+
 local function Compute()
 	pins = {}
 
 	local MountModel = addon.MountModel
-	if not (MountModel and MountModel.BuildRow and MountModel.CandidateSet) then
+	if not (MountModel and MountModel.BuildRow) then
 		return
 	end
 
@@ -67,13 +97,8 @@ local function Compute()
 		})
 	end
 
-	for _, mountID in ipairs(MountModel.CandidateSet(nil)) do
+	for _, mountID in ipairs(PositionedCandidates()) do
 		consider(mountID)
-	end
-	if MountModel.GlobalCandidateSet then
-		for _, mountID in ipairs(MountModel.GlobalCandidateSet()) do
-			consider(mountID)
-		end
 	end
 end
 

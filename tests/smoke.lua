@@ -138,6 +138,20 @@ if SCENARIO == "warm" then
             "AddMinimapIconMap was never called")
     end)
 
+    step("warm: Compute only pins positioned mounts, not the whole journal", function()
+        addon.db.showVendorIcons = false
+        addon.db.showMapIcons = true
+        addon.MountModel.InvalidateCache()
+        addon.Map.Rebuild()
+        -- Fixture positioned mounts with showVendorIcons off: just mount 8 (a
+        -- curated points entry -- see tests/init.lua D.overrides.points). The
+        -- journal has 4 mounts; Compute must not walk the whole candidate set.
+        check("exactly one world pin (the single positioned fixture mount)",
+            Stub.data.worldPins == 1, Stub.data.worldPins)
+        addon.MountModel.InvalidateCache()
+        addon.Map.Rebuild()
+    end)
+
     step("warm: turning both icon sets off places nothing", function()
         addon.db.showMapIcons = false
         addon.db.showMinimapIcons = false
@@ -265,6 +279,33 @@ step("Filter by source: unchecking 'Show Vendor' hides vendor mounts", function(
     addon.RefreshWindow()
     Harness.runTimers()
 end)
+
+if SCENARIO == "warm" then
+    step("filter toggle through the panel rebuilds the map pins", function()
+        local s = Stub.data.settings
+        Stub.data.zone, Stub.data.mapID = "Stormwind City", 84
+        addon.db.showObtainableOnly = false
+        addon.MountModel.InvalidateCache()
+        addon.Map.Rebuild()
+
+        -- A rebuild calls RemoveAllWorldMapIcons (resets the pin counter) then
+        -- re-places pins. Flip a cache-affecting setting via its panel binding
+        -- and confirm the pin set was recomputed, not left stale.
+        local seenRebuild = false
+        local lib = _G.LibStub("HereBeDragons-Pins-2.0")
+        local realRemove = lib.RemoveAllWorldMapIcons
+        lib.RemoveAllWorldMapIcons = function(...)
+            seenRebuild = true
+            return realRemove(...)
+        end
+        if s.showObtainableOnly then s.showObtainableOnly.set(true) end
+        lib.RemoveAllWorldMapIcons = realRemove
+
+        check("toggling showObtainableOnly triggered a map rebuild", seenRebuild,
+            "Map.Rebuild was not called from OnSettingChanged")
+        if s.showObtainableOnly then s.showObtainableOnly.set(false) end
+    end)
+end
 
 -- ---------------------------------------------------------------------------
 -- WS4: one source-type model (MountModel.SOURCE_ORDER is canonical)

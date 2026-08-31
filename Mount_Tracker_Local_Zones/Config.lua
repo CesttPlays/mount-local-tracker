@@ -24,6 +24,13 @@ local function InvalidateAndRefresh()
 	if addon.RefreshWindow then
 		addon.RefreshWindow()
 	end
+	-- Map.Compute filters pins on row.include, which folds in every list filter
+	-- (showCollected / showObtainableOnly / showUnusable / hiddenSources /
+	-- showVendorIcons). Any change that invalidates the window model also changes
+	-- which mounts should be pinned, so rebuild the pin set too.
+	if addon.Map then
+		addon.Map.Rebuild()
+	end
 end
 
 -- React only to what each setting actually affects.
@@ -51,16 +58,9 @@ local function OnSettingChanged(key)
 		return
 	end
 
-	-- showVendorIcons feeds row.point for vendor mounts (part of the model cache
-	-- key now) *and* drives the map pins, so it needs both a rebuild and a
-	-- cache invalidation. It falls through to the CACHE_AFFECTING check below.
-	if key == "showVendorIcons" and addon.Map then
-		addon.Map.Rebuild()
-	end
-
 	-- groupBy / showCollected / showObtainableOnly / showUnusable / showGlobal /
-	-- showVendorIcons or a hiddenSources toggle: the list content changes, so
-	-- drop the model cache and refresh the window.
+	-- showVendorIcons or a hiddenSources toggle: the list content -- and therefore
+	-- the map pin set -- changes, so invalidate the model cache and refresh both.
 	if key == "hiddenSources" or CACHE_AFFECTING[key] then
 		InvalidateAndRefresh()
 	end
