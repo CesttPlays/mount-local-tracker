@@ -224,12 +224,13 @@ class TestOverrides(unittest.TestCase):
                     self.assertIsInstance(value, (int, float), f"mount {mount_id} vendor {axis} {value!r}")
                     self.assertTrue(0 <= value <= 10000, f"mount {mount_id} vendor {axis}={value}")
 
-    def test_rep_faction_entries_are_number_pairs(self):
+    def test_rep_faction_entries_have_numeric_faction_and_standing(self):
         for mount_id, entry in self.ov["repFaction"].items():
-            pair = to_list(entry)
-            self.assertEqual(len(pair), 2, f"mount {mount_id} repFaction is not a pair")
-            for value in pair:
-                self.assertIsInstance(value, (int, float), f"mount {mount_id} repFaction {value!r}")
+            for key in ("factionID", "standing"):
+                value = entry[key]
+                self.assertIsInstance(
+                    value, (int, float), f"mount {mount_id} repFaction {key} {value!r}"
+                )
 
     def test_drop_chance_values_are_non_empty_strings(self):
         for mount_id, text in self.ov["dropChance"].items():

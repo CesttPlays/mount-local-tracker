@@ -59,8 +59,7 @@ local function ReputationProgress(factionID, threshold)
 	if C_Reputation and type(C_Reputation.GetFactionDataByID) == "function" then
 		local data = SafeApiCall(C_Reputation.GetFactionDataByID, factionID)
 		if type(data) == "table" and data.currentStanding then
-			local standing = data.currentReactionThreshold and data.currentStanding
-				or data.currentStanding
+			local standing = data.currentStanding
 			return standing, threshold, standing >= threshold, nil
 		end
 	end
@@ -105,9 +104,9 @@ local function FormatGold(copper)
 end
 
 local function VendorDetail(vendor, affordable)
-	local cost = vendor.cost or vendor[5]
-	local currencyID = vendor.currencyID or vendor[6]
-	local npc = vendor.npc or vendor.name
+	local cost = vendor.cost
+	local currencyID = vendor.currencyID
+	local npc = vendor.npc
 	local price
 	if not cost then
 		price = nil
@@ -146,8 +145,8 @@ function Obtainability.Evaluate(mountID, row)
 	-- 1. Reputation / renown gate.
 	local repFaction = pick("repFaction", mountID)
 	if type(repFaction) == "table" then
-		local factionID = repFaction.factionID or repFaction[1]
-		local threshold = repFaction.standing or repFaction[2]
+		local factionID = repFaction.factionID
+		local threshold = repFaction.standing
 		local current, needed, met, label = ReputationProgress(factionID, threshold)
 		if met == false then
 			local detail = label and ("%s / need %s"):format(label, tostring(needed))
@@ -160,8 +159,8 @@ function Obtainability.Evaluate(mountID, row)
 	-- 2. Vendor purchase.
 	local vendor = pick("vendor", mountID)
 	if type(vendor) == "table" then
-		local cost = vendor.cost or vendor[5]
-		local currencyID = vendor.currencyID or vendor[6]
+		local cost = vendor.cost
+		local currencyID = vendor.currencyID
 		local affordable
 		if not cost then
 			affordable = true
