@@ -545,8 +545,12 @@ function MountModel.GetZoneMounts()
 	return groups, zoneName, mapID
 end
 
--- Re-evaluate obtainability for the mounts already in the cached list, without a
--- full re-derivation. Backs NEW_MOUNT_ADDED / MOUNT_JOURNAL_USABILITY_CHANGED.
+-- In-place refresh of obtainability for the rows already in the cached list;
+-- never adds or removes rows. Only valid when the candidate set is unchanged
+-- (MOUNT_JOURNAL_USABILITY_CHANGED). If a cached row's membership actually
+-- changed -- BuildRow now returns nil or a row with include == false -- we can't
+-- fix that in place, so drop the cache and let the next GetZoneMounts rebuild
+-- rather than leave a stale row on screen.
 function MountModel.RefreshCachedStates()
 	RefreshAccountCounts()
 
@@ -556,13 +560,15 @@ function MountModel.RefreshCachedStates()
 	for _, group in ipairs(cache.groups) do
 		for _, row in ipairs(group.rows) do
 			local fresh = BuildRow(row.id)
-			if fresh then
-				row.state = fresh.state
-				row.detail = fresh.detail
-				row.sortRank = fresh.sortRank
-				row.isUsable = fresh.isUsable
-				row.isCollected = fresh.isCollected
+			if not fresh or not fresh.include then
+				MountModel.InvalidateCache()
+				return
 			end
+			row.state = fresh.state
+			row.detail = fresh.detail
+			row.sortRank = fresh.sortRank
+			row.isUsable = fresh.isUsable
+			row.isCollected = fresh.isCollected
 		end
 		FinishGroup(group)
 	end

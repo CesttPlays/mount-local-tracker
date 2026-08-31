@@ -266,11 +266,24 @@ local function RequestRefresh()
 	RunRefresh()
 end
 
--- NEW_MOUNT_ADDED / MOUNT_JOURNAL_USABILITY_CHANGED change mount *state*, never
--- zone membership. Coalesce a burst into one cheap state-only refresh.
+-- MOUNT_JOURNAL_USABILITY_CHANGED changes mount *state* only, never which mounts
+-- exist. Coalesce a burst into one cheap in-place refresh (no full re-derive).
 local RequestStateRefresh = Debounced(0.5, function()
 	if addon.MountModel then
 		addon.MountModel.RefreshCachedStates()
+	end
+	if addon.RefreshWindow then
+		addon.RefreshWindow()
+	end
+end)
+
+-- NEW_MOUNT_ADDED changes list *membership* (a mount became collected, and with
+-- "Show collected" off its row must leave). An in-place refresh can't drop rows,
+-- so take the full-rebuild path -- same as a zone change -- behind its own
+-- debounce.
+local RequestMembershipRefresh = Debounced(0.5, function()
+	if addon.MountModel then
+		addon.MountModel.InvalidateCache()
 	end
 	if addon.RefreshWindow then
 		addon.RefreshWindow()
@@ -417,9 +430,11 @@ frame:SetScript("OnEvent", function(_, event, arg1)
 	end
 
 	if mountEvents[event] then
-		RequestStateRefresh()
 		if event == "NEW_MOUNT_ADDED" then
+			RequestMembershipRefresh()
 			RequestMapRefresh()
+		else
+			RequestStateRefresh()
 		end
 		return
 	end

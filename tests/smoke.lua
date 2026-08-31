@@ -313,6 +313,43 @@ if SCENARIO == "warm" then
     end)
 end
 
+-- ---------------------------------------------------------------------------
+-- WS8: NEW_MOUNT_ADDED drops a just-collected row (RefreshCachedStates never
+-- silently keeps a stale row)
+-- ---------------------------------------------------------------------------
+if SCENARIO == "warm" then
+    step("stale rows: collecting a listed mount removes it on NEW_MOUNT_ADDED", function()
+        local model = addon.MountModel
+        Stub.data.zone, Stub.data.mapID = "Stormwind City", 84
+        addon.db.showCollected = false
+        model.InvalidateCache()
+
+        local function listed(mountID)
+            local groups = model.GetZoneMounts()
+            for _, group in ipairs(groups) do
+                for _, row in ipairs(group.rows) do
+                    if row.id == mountID then return true end
+                end
+            end
+            return false
+        end
+
+        check("mount 18 is listed while uncollected", listed(18))
+
+        -- Flip the stub to collected and fire the real event; the debounced
+        -- membership refresh must invalidate the cache so the row leaves.
+        Harness.collectMount(18)
+        Harness.runTimers()
+
+        check("mount 18 is gone from GetZoneMounts after NEW_MOUNT_ADDED",
+            not listed(18))
+
+        -- restore fixture state for the steps that follow
+        Stub.data.mountInfo[18].isCollected = false
+        model.InvalidateCache()
+    end)
+end
+
 step("minimap button toggle (ApplyMinimapButton both ways)", function()
     addon.db.showMinimapButton = false
     addon.ApplyMinimapButton()
