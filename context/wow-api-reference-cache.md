@@ -5,28 +5,23 @@ Source of truth for this repo's addon work. Target build: TOC `## Interface: 120
 Two tiers:
 - **Carried over** — validated in-game in the sibling repo `achivement-local-tracker` and
   reused here unchanged. Trust but re-check on first use in this addon.
-- **Pending** — the mount / reputation / currency calls this addon *already uses* (phases
-  1-7) but that are NOT yet validated in-game. Move an entry to a dated "validated" note
-  once its code path runs clean in the live client. See `context/phase8-ingame-checklist.md`.
-
-Everything under PENDING below is wired into shipped code as of phase 7. The load-bearing
-assumption is the `GetMountInfoByID` return-tuple order — a wrong index silently empties or
-mis-colours the whole list. `Obtainability.lua` also assumes field names on
-`C_Reputation.GetFactionDataByID` / `C_MajorFactions.GetMajorFactionData` /
-`C_CurrencyInfo.GetCurrencyInfo` (only exercised once `Overrides` seeds `repFaction` / a
-currency `vendor`, which phase 6 did for ~10 mounts).
+- **Validated in-game 2026-08-31** — the mount / reputation / currency calls this addon
+  uses, confirmed working in the live client during the phase-8 checklist pass (A-G, no
+  addon-code fixes needed). `GetMountInfoByID` returns the tuple in the assumed order; the
+  `C_Reputation` / `C_MajorFactions` / `C_CurrencyInfo` field names hold; HBD-Pins places
+  pins at the given coords.
 
 ---
 
-## PENDING — Reputation / currency / money (Obtainability.lua)
+## VALIDATED 2026-08-31 — Reputation / currency / money (Obtainability.lua)
 
 Signatures from warcraft.wiki.gg. All guarded (`type(fn)=="function"` + `pcall`); a missing
 field just yields "unknown" and the mount shows as a plain drop.
 
 ### C_Reputation.GetFactionDataByID(factionID) -> FactionData
 - Fields read: `currentStanding`, `currentReactionThreshold`. Classic-rep vendor mounts in
-  `Overrides.repFaction` encode "Exalted" as the raw cumulative value `42000` — verify
-  `currentStanding` is cumulative (not a within-tier delta) on 12.1.
+  `Overrides.repFaction` encode "Exalted" as the raw cumulative value `42000`;
+  `currentStanding` is cumulative (not a within-tier delta) on 12.1 — confirmed in-game.
 - `C_Reputation.GetFactionDataByID` replaced the old `GetFactionInfoByID` (index-based).
 
 ### C_MajorFactions.GetMajorFactionData(factionID) -> { renownLevel, ... }
@@ -50,10 +45,10 @@ field just yields "unknown" and the mount shows as a plain drop.
 
 ---
 
-## PENDING — HereBeDragons-Pins-2.0 (Map.lua)
+## VALIDATED 2026-08-31 — HereBeDragons-Pins-2.0 (Map.lua)
 
-Vendored lib, but the call signatures are assumed from the sibling's Map.lua (achievements)
-and not re-checked for mounts:
+Vendored lib; signatures carried from the sibling's Map.lua (achievements), pins confirmed
+to land at the given coords in-game 2026-08-31:
 - `HBDPins:AddWorldMapIconMap(ref, pin, uiMapID, x, y, showFlag)` — `showFlag` =
   `HBD_PINS_WORLDMAP_SHOW_PARENT` (or `1`); returns falsey when the pin can't be placed.
 - `HBDPins:AddMinimapIconMap(ref, pin, uiMapID, x, y, showInParentZone, floatOnEdge)`.
@@ -62,10 +57,10 @@ and not re-checked for mounts:
 
 ---
 
-## PENDING — Mounts (C_MountJournal)
+## VALIDATED 2026-08-31 — Mounts (C_MountJournal)
 
-Not yet validated in this addon. Signatures from warcraft.wiki.gg, current as of the
-War Within / Midnight API.
+Signatures from warcraft.wiki.gg, current as of the War Within / Midnight API. The
+`GetMountInfoByID` tuple order below drives the whole list and is confirmed in-game.
 
 ### C_MountJournal.GetMountIDs() -> number[]
 - All mount IDs known to the client (collected or not). The id IS the DB2 `Mount.ID` on

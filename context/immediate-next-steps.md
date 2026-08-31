@@ -1,37 +1,44 @@
 # Immediate next steps
 
-## Current state
-- **Phases 1-7 built on branch `phase-buildout`, all green offline.** Not validated in-game,
-  not merged to `main`, not released.
+## Current state (2026-08-31)
+- **Phases 1-8 done. Merged to `main`.** PR #1 (vendor waypoints) and PR #2 (context
+  reconcile) merged. Stale `phase-buildout` / `feat/vendor-waypoints` branches deleted.
+- All green offline:
   - `luacheck .` -> 0/0 (11 addon files)
   - `python tests/run.py` -> cold 73/73, warm 86/86
   - `python -m unittest discover -s tests -p "test_*.py"` -> 63 (35 generator + 23 mountdata + 5 toc)
+- **In-game: validated 2026-08-31.** Worked through `context/phase8-ingame-checklist.md`
+  A-G in the live client — everything runs, no addon-code fixes were needed. The
+  load-bearing WoW API assumptions (`GetMountInfoByID` tuple order, HBD-Pins arg order,
+  the Settings metatable-proxy binding, `C_Reputation` / `C_MajorFactions` field names)
+  are now confirmed; see `context/wow-api-reference-cache.md`. Curated coords in
+  `Overrides.lua` remain eyeballed (display-only, per plan).
+- **Not released yet.** No git tag, no GitHub Release. TOC at the default `## Version: 0.1.0`.
 
-## Next: phase 8 — in-game validation + first release
-1. When it passes: bring `context/` fully up to date, merge `phase-buildout` -> `main`.
-2. Before the first release, set up on GitHub: the **`deploy` environment**, the
-   **"Allow GitHub Actions to create and approve pull requests"** repo setting (for the
-   refresh workflow), and — when the CurseForge project exists — the `CF_API_KEY` secret in
-   `deploy` + a `## X-Curse-Project-ID` line in the `.toc`.
-3. First release: **manual dispatch of `release.yml` with `version = 0.1.0`.**
+## GitHub setup (pending — needed before the first release)
+- **`deploy` environment** — create it:
+  `gh api --method PUT repos/CesttPlays/mount-local-tracker/environments/deploy`
+- **"Allow GitHub Actions to create and approve pull requests"** — enable it (needed by
+  `refresh-mount-data.yml`'s `create-pull-request` step): repo Settings -> Actions ->
+  General -> Workflow permissions, or
+  `gh api --method PUT repos/CesttPlays/mount-local-tracker/actions/permissions/workflow -F can_approve_pull_request_reviews=true -f default_workflow_permissions=read`
+- Only when the CurseForge project exists: the `CF_API_KEY` secret in the `deploy`
+  environment + a `## X-Curse-Project-ID` line in the `.toc`. GitHub Release + zip work
+  without them.
 
-## Build order (done)
-1. Skeleton — DONE. TOC, Core.lua, empty MountData.lua, Overrides stub, Mechanic.lua, Libs,
-   `.luacheckrc` / `.pkgmeta` / `LICENSE` / `run-tests.ps1`, README.
-2. Generator v1 — DONE. `tools/generate_mount_zones.py` (instance loot-table + SourceText
-   `Zone:`/`Location:` parse + global bucket). `MountData.lua` for 12.1.0.69497.
-   `tests/test_generator.py` (35).
-3. MountModel + Obtainability + ListView + Window — DONE. Smoke harness ported.
-4. Config + MinimapButton — DONE. Settings panel + "Hidden mounts" subcategory + minimap
-   launcher.
-5. Map — DONE. HBD-Pins world + minimap pins for positioned uncollected mounts.
-6. Overrides seed — DONE. ~30 mounts (7 rare-drop pins, 18 lockouts, 7 vendors, 5 repFaction,
-   3 add). `context/phase6-overrides-seed.md` has the low-confidence list.
-7. tests/ + CI + release + context — DONE. `tests/test_mountdata.py` (23), `tests/test_toc.py`
-   (5), `.github/workflows/{ci,refresh-mount-data,release}.yml`, `CURSEFORGE.md`, README
-   badges, context refresh, `context/phase8-ingame-checklist.md`.
-8. In-game validation + first release — PENDING (see "Next" above).
+## Next: first release (0.1.0)
+1. Do the "GitHub setup" above (deploy environment + the Actions PR-creation toggle).
+2. **Manual dispatch of `release.yml` with `version = 0.1.0`** — bumps the `.toc`, tags
+   `v0.1.0`, runs the BigWigs packager, publishes the GitHub Release + zip.
+3. CurseForge upload only happens once the project exists and `CF_API_KEY` /
+   `## X-Curse-Project-ID` are wired.
+
+## Deferred (not blockers — see `context/future-features.md`)
+- Achievement-reward mount -> zone resolver (~60 mounts sitting in `global`).
+- `lockoutQuest` ids so Obtainability can show "done this reset".
+- Variant-map dedup for the `zones` table.
+- Vendor cost / rep-requirement from DB2 instead of hand-curation.
 
 ## Working rule
-- Test in-game before merging to main / releasing ([[no-push-until-tested]]).
-- Deploy = copy the whole addon folder.
+- Test in-game before releasing ([[no-push-until-tested]]).
+- Deploy = copy the whole `Mount_Tracker_Local_Zones/` folder.

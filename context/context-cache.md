@@ -13,9 +13,13 @@
   place of achievements.
 - Solo developer, new to Lua and the WoW API, plans to publish (CurseForge/WoWInterface).
   Release-quality; no debug spam on by default.
-- Status: **phases 1-7 built on branch `phase-buildout`**, all green offline. Not yet
-  validated in-game, not merged to `main`, not released. Plan approved 2026-08-30.
-- Last updated: 2026-08-30
+- Status: **phases 1-8 done, merged to `main`** (PR #1 vendor waypoints + PR #2 context
+  reconcile; stale `phase-buildout` / `feat/vendor-waypoints` branches deleted). All green
+  offline. **Validated in-game 2026-08-31** (checklist A-G, no addon-code fixes needed) —
+  the load-bearing WoW API assumptions are confirmed. Not released yet — no tag, no GitHub
+  Release, TOC at default `0.1.0`; needs the `deploy` environment + Actions PR-creation
+  toggle, then a manual `release.yml` dispatch at `version = 0.1.0`. Plan approved 2026-08-30.
+- Last updated: 2026-08-31
 
 ## Locked decisions (2026-08-30)
 - **Addon folder**: `Mount_Tracker_Local_Zones/` (spelled correctly). **SavedVariables**:
@@ -153,8 +157,9 @@
 
 ## Open items / risks
 - Coverage ~41% zone-resolved; the rest are honest `global` or need `Overrides` curation.
-- Phase-6 curated coords / the raw-reputation encoding for classic-rep vendors are
-  eyeballed — flagged in `context/phase6-overrides-seed.md` + the phase-8 checklist.
-- Mount-specific APIs are all still **unverified in-game** — see
-  `context/wow-api-reference-cache.md` (GetMountInfoByID tuple order is load-bearing).
+- Phase-6 curated coords are eyeballed spawn centroids — display-only, good enough for
+  "there's a marker in roughly the right zone"; flagged in
+  `context/phase6-overrides-seed.md`. The classic-rep `42000` encoding checked out in-game.
+- Mount / reputation / currency APIs **validated in-game 2026-08-31** — see
+  `context/wow-api-reference-cache.md`.
 - No `X-Curse-Project-ID` until the CurseForge project exists.
