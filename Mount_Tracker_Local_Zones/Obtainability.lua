@@ -19,10 +19,10 @@ local STATE = {
 	available         = { rank = 1, color = { 0.40, 0.85, 0.40 } },
 	farmable          = { rank = 2, color = { 1.00, 0.82, 0.00 } },
 	drop              = { rank = 3, color = { 0.87, 0.86, 0.81 } },
-	quest_gated       = { rank = 4, color = { 0.85, 0.55, 0.45 } },
-	rep_gated         = { rank = 5, color = { 0.85, 0.55, 0.45 } },
-	achievement_gated = { rank = 6, color = { 0.85, 0.55, 0.45 } },
-	reset_locked      = { rank = 7, color = { 0.60, 0.60, 0.62 } },
+	quest_gated       = { rank = 4, color = { 0.85, 0.55, 0.45 }, dim = true },
+	rep_gated         = { rank = 5, color = { 0.85, 0.55, 0.45 }, dim = true },
+	achievement_gated = { rank = 6, color = { 0.85, 0.55, 0.45 }, dim = true },
+	reset_locked      = { rank = 7, color = { 0.60, 0.60, 0.62 }, dim = true },
 	collected         = { rank = 8, color = { 0.50, 0.50, 0.50 } },
 }
 
@@ -31,6 +31,12 @@ Obtainability.STATE = STATE
 function Obtainability.Color(state)
 	local entry = STATE[state] or STATE.drop
 	return entry.color[1], entry.color[2], entry.color[3]
+end
+
+-- True for states drawn dimmed ("you can't get this here right now").
+function Obtainability.IsDimmed(state)
+	local e = STATE[state]
+	return e and e.dim or false
 end
 
 -- ============================================================================

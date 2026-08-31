@@ -16,20 +16,9 @@ local HBDPins = LibStub and LibStub("HereBeDragons-Pins-2.0", true)
 local FALLBACK_ICON = "Interface\\ICONS\\Ability_Mount_RidingHorse"
 local SHOW_ON_PARENT = HBD_PINS_WORLDMAP_SHOW_PARENT or 1
 
--- Colour + alpha by obtainability state (mirrors the ListView row colours).
-local COLOR_AVAILABLE = { 0.40, 0.85, 0.40 }
-local COLOR_FARMABLE = { 1.00, 0.82, 0.00 }
-local COLOR_DROP = { 0.90, 0.90, 0.90 }
-local COLOR_GATED = { 0.55, 0.40, 0.40 }
+-- Colour comes from addon.Obtainability (single source of truth, shared with the
+-- ListView rows). Alpha for dimmed states is a map-rendering choice, kept here.
 local ALPHA_GATED = 0.55
-
--- States drawn dimmed: "you can't get this here right now".
-local GATED_STATE = {
-	rep_gated = true,
-	achievement_gated = true,
-	quest_gated = true,
-	reset_locked = true,
-}
 
 -- ============================================================================
 -- What to pin: uncollected positioned mounts, grouped by their pin map
@@ -115,17 +104,10 @@ local function DressPin(pin, entry)
 	pin.spellID = entry.spellID
 	pin.texture:SetTexture(entry.icon or FALLBACK_ICON)
 
-	local gated = GATED_STATE[entry.state]
-	local color = COLOR_DROP
-	if gated then
-		color = COLOR_GATED
-	elseif entry.state == "available" then
-		color = COLOR_AVAILABLE
-	elseif entry.state == "farmable" then
-		color = COLOR_FARMABLE
-	end
-	pin.texture:SetVertexColor(color[1], color[2], color[3])
-	pin.texture:SetAlpha(gated and ALPHA_GATED or 1)
+	local r, g, b = addon.Obtainability.Color(entry.state)
+	local dim = addon.Obtainability.IsDimmed(entry.state)
+	pin.texture:SetVertexColor(r, g, b)
+	pin.texture:SetAlpha(dim and ALPHA_GATED or 1)
 end
 
 -- ============================================================================
