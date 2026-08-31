@@ -51,6 +51,13 @@ function MountModel.SourceLabel(s)
 	return SOURCE_LABEL[s] or "Other"
 end
 
+-- Grouping bucket for a source-type string (groupBy == "source").
+-- Returns key, label, rank. nil / unknown source -> the "other" bucket.
+local function SourceBucket(source)
+	local s = source or "other"
+	return "s:" .. s, SOURCE_LABEL[s] or "Other", SOURCE_RANK[s] or SOURCE_RANK.other
+end
+
 -- ============================================================================
 -- Expansion groups (groupBy == "expansion")
 -- ============================================================================
@@ -71,15 +78,18 @@ local EXPANSION_LABEL = {
 	[11] = "Midnight",
 }
 
-local function ExpansionLabel(id)
-	local n = tonumber(id)
+-- Grouping bucket for an expansion id (groupBy == "expansion").
+-- Returns key, label, rank. Classic-era / negative ids clamp to one "Classic"
+-- bucket; non-numeric / nil ids fall to the "Other" bucket, sorted last.
+local function ExpansionBucket(raw)
+	local n = tonumber(raw)
 	if not n then
-		return "Other"
+		return "e:x", "Other", 99
 	end
 	if n < 0 then
 		n = 0
 	end
-	return EXPANSION_LABEL[n] or "Other"
+	return "e:" .. n, EXPANSION_LABEL[n] or "Other", -n
 end
 
 -- ============================================================================
@@ -315,17 +325,9 @@ local function GroupRows(ids, groupBy, isGlobal)
 		if row then
 			local key, label, rank
 			if groupBy == "expansion" then
-				-- Clamp classic-era / unknown ids to one "Classic" bucket so a
-				-- stray -3 does not spawn a second Classic group.
-				local exp = tonumber(row.expansion)
-				exp = (exp and exp >= 0) and exp or (exp and 0) or nil
-				key = "e:" .. tostring(exp or "x")
-				label = row.expansion ~= nil and ExpansionLabel(exp) or "Other"
-				rank = exp and -exp or 99 -- newest first, unknown last
+				key, label, rank = ExpansionBucket(row.expansion)
 			else
-				key = "s:" .. row.source
-				label = SOURCE_LABEL[row.source] or "Other"
-				rank = SOURCE_RANK[row.source] or SOURCE_RANK.other
+				key, label, rank = SourceBucket(row.source)
 			end
 			if isGlobal then
 				key = "g:" .. key
