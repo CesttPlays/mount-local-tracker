@@ -236,8 +236,10 @@ end
 -- not-yet-loaded mount. row.include is the boolean "list this row" verdict --
 -- callers that only want the listed rows check it, while the zone summary folds
 -- over every row so collected / hidden mounts still count toward the zone totals.
--- row = { id, name, spellID, icon, isUsable, isCollected, source, subcat,
+-- row = { id, name, spellID, icon, isUsable, isCollected, source,
 --         expansion, state, detail, sortRank, point, include }
+-- subcat is deliberately not on the row: its only reader is the tooltip, which
+-- pulls it straight from addon.Curated("subcat", id).
 local function BuildRow(mountID)
 	local name, spellID, icon, _, isUsable, _, _, _, _, _, isCollected =
 		addon.MountInfo(mountID)
@@ -268,7 +270,6 @@ local function BuildRow(mountID)
 		isUsable = isUsable ~= false,
 		isCollected = isCollected and true or false,
 		source = source,
-		subcat = Curated("subcat", mountID),
 		expansion = Curated("expansion", mountID),
 		point = PointFor(mountID),
 	}

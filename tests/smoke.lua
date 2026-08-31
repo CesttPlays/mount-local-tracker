@@ -203,6 +203,22 @@ step("obtainability reads the Overrides seed", function()
     check("affordable Overrides vendor mount -> 'available'", buy.state == "available", buy.state)
 end)
 
+-- WS10: subcat surfaces as a dim tooltip line for a subcat'd instance mount.
+step("tooltip: a subcat'd instance mount gets a 'Raid drop' context line", function()
+    -- 168 Fiery Warhorse: MountData source = "instance", subcat = "raid".
+    local lines = {}
+    local tip = { AddLine = function(_, text) lines[#lines + 1] = tostring(text) end }
+    addon.Obtainability.AddTooltipLines(tip, 168)
+    local sawSubcat = false
+    for _, line in ipairs(lines) do
+        if line:find("Raid drop", 1, true) or line:find("Dungeon drop", 1, true) then
+            sawSubcat = true
+        end
+    end
+    check("AddTooltipLines emitted a 'Raid drop' line for mount 168", sawSubcat,
+        table.concat(lines, " | "))
+end)
+
 -- ---------------------------------------------------------------------------
 -- Slash commands
 -- ---------------------------------------------------------------------------

@@ -257,4 +257,15 @@ function Obtainability.AddTooltipLines(tooltip, mountID)
 	if note and note ~= result.detail then
 		tooltip:AddLine(note, 0.7, 0.7, 0.7, true)
 	end
+
+	-- Dim instance-context line derived from the curated sub-category. Only shown
+	-- for instance-sourced mounts that have a subcat, and skipped when result.detail
+	-- already implies it (e.g. mentions "raid" / "dungeon").
+	local subcat = pick("subcat", mountID)
+	local SUBCAT_LABEL = { dungeon = "Dungeon drop", raid = "Raid drop", rare = "Rare drop" }
+	local subcatLine = row.source == "instance" and subcat and SUBCAT_LABEL[subcat]
+	if subcatLine
+		and not (result.detail and result.detail:lower():find(subcat:lower(), 1, true)) then
+		tooltip:AddLine(subcatLine, 0.5, 0.5, 0.5, true)
+	end
 end
