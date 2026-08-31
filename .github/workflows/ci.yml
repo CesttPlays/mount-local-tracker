@@ -74,5 +74,8 @@ jobs:
       - name: Check MountData.lua / Overrides.lua structure
         run: python -m unittest discover -s tests -p "test_mountdata.py" -v
 
+      - name: Check obtainability engine
+        run: python -m unittest discover -s tests -p "test_obtainability.py" -v
+
       - name: Check TOC / packaging consistency
         run: python -m unittest discover -s tests -p "test_toc.py" -v

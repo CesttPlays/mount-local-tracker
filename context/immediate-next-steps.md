@@ -5,9 +5,10 @@
   reconcile) and PR #3 (phase-9 code-quality refactor) merged. Stale `phase-buildout` /
   `feat/vendor-waypoints` branches deleted.
 - All green offline:
-  - `luacheck .` -> 0/0 (11 addon files)
-  - `python tests/run.py` -> cold 73/73, warm 86/86
-  - `python -m unittest discover -s tests -p "test_*.py"` -> 63 (35 generator + 23 mountdata + 5 toc)
+  - `luacheck .` -> 0/0 (12 addon files)
+  - `python tests/run.py` -> cold 89/89, warm 121/121
+  - `python -m unittest discover -s tests -p "test_*.py"` -> 90 (35 generator + 23 mountdata
+    + 27 obtainability + 5 toc)
 - **In-game: validated 2026-08-31.** Worked through `context/phase8-ingame-checklist.md`
   A-G in the live client — everything runs, no addon-code fixes were needed. The
   load-bearing WoW API assumptions (`GetMountInfoByID` tuple order, HBD-Pins arg order,
