@@ -10,29 +10,59 @@ local categoryID
 -- canonical source-type list) so its checkboxes always match the tracker list's
 -- group headers. Labels come from addon.MountModel.SourceLabel.
 
+-- Settings whose value is folded into the MountModel cache key (see
+-- MountModel.CACHE_KEYS). Changing any of them changes the tracker list content.
+local CACHE_AFFECTING = {}
+for _, key in ipairs((addon.MountModel and addon.MountModel.CACHE_KEYS) or {}) do
+	CACHE_AFFECTING[key] = true
+end
+
+local function InvalidateAndRefresh()
+	if addon.MountModel then
+		addon.MountModel.InvalidateCache()
+	end
+	if addon.RefreshWindow then
+		addon.RefreshWindow()
+	end
+end
+
 -- React only to what each setting actually affects.
 local function OnSettingChanged(key)
 	if key == "showMinimapButton" then
 		if addon.ApplyMinimapButton then
 			addon.ApplyMinimapButton()
 		end
-	elseif key == "showMapIcons" or key == "showMinimapIcons" or key == "showVendorIcons" then
-		if addon.Map then
-			addon.Map.Rebuild()
-		end
-	elseif key == "windowStyle" then
+		return
+	end
+
+	if key == "windowStyle" then
 		if addon.NotifyWindowStyleChanged then
 			addon.NotifyWindowStyleChanged()
 		end
-	else
-		-- groupBy / showCollected / showObtainableOnly / showUnusable / showGlobal
-		-- / a hiddenSources toggle: the list content changes, so drop the cache.
-		if addon.MountModel then
-			addon.MountModel.InvalidateCache()
+		return
+	end
+
+	-- Map-only toggles: they change world/minimap icon rendering, nothing in the
+	-- tracker list.
+	if key == "showMapIcons" or key == "showMinimapIcons" then
+		if addon.Map then
+			addon.Map.Rebuild()
 		end
-		if addon.RefreshWindow then
-			addon.RefreshWindow()
-		end
+		return
+	end
+
+	-- showVendorIcons feeds row.point for vendor mounts (part of the model cache
+	-- key now) *and* drives the map pins, so it needs both a rebuild and a
+	-- cache invalidation. It falls through to the CACHE_AFFECTING check below.
+	if key == "showVendorIcons" and addon.Map then
+		addon.Map.Rebuild()
+	end
+
+	-- groupBy / showCollected / showObtainableOnly / showUnusable / showGlobal /
+	-- showVendorIcons or a hiddenSources toggle: the list content changes, so
+	-- drop the model cache and refresh the window.
+	if key == "hiddenSources" or CACHE_AFFECTING[key] then
+		InvalidateAndRefresh()
 	end
 end
 

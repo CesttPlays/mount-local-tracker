@@ -22,6 +22,21 @@ local MAX_TREE_DEPTH = 15
 -- zone "available" count.
 local OBTAINABLE = { available = true, farmable = true, drop = true }
 
+-- The db fields that change which rows GetZoneMounts produces. The cache key is
+-- derived from exactly this list (plus the hiddenSources / hidden hashes), and
+-- Config.lua drives cache invalidation off the same list -- so covering a new
+-- filter means editing one list, not two hand-kept call sites. Every entry here
+-- must be a db field BuildRow / row.include (or the group/global split) reads.
+local CACHE_KEYS = {
+	"groupBy",
+	"showCollected",
+	"showObtainableOnly",
+	"showGlobal",
+	"showUnusable",
+	"showVendorIcons",
+}
+MountModel.CACHE_KEYS = CACHE_KEYS
+
 -- ============================================================================
 -- Source-type groups (groupBy == "source")
 -- ============================================================================
@@ -429,6 +444,38 @@ local function hiddenSourcesHash()
 	return table.concat(keys, ",")
 end
 
+-- Sorted concat of the hidden mount ids (db.hidden). Same shape as
+-- hiddenSourcesHash: folding it into the cache key means hiding / restoring a
+-- mount changes the key on its own, no separate InvalidateCache() call needed.
+local function hiddenHash()
+	local db = addon.db
+	if not (db and db.hidden) then
+		return ""
+	end
+	local keys = {}
+	for id, value in pairs(db.hidden) do
+		if value then
+			keys[#keys + 1] = id
+		end
+	end
+	table.sort(keys)
+	return table.concat(keys, ",")
+end
+
+-- The GetZoneMounts cache key: mapID + every CACHE_KEYS db field + the two
+-- hidden-set hashes. Covers exactly what BuildRow / row.include and the
+-- group/global split depend on.
+local function cacheKey(mapID)
+	local db = addon.db or EMPTY
+	local parts = { tostring(mapID) }
+	for _, k in ipairs(CACHE_KEYS) do
+		parts[#parts + 1] = tostring(db[k])
+	end
+	parts[#parts + 1] = hiddenSourcesHash()
+	parts[#parts + 1] = hiddenHash()
+	return table.concat(parts, "|")
+end
+
 -- Returns: groups, zoneName, mapID.
 function MountModel.GetZoneMounts()
 	local zoneName = addon.GetCurrentLocationName()
@@ -436,15 +483,7 @@ function MountModel.GetZoneMounts()
 
 	local db = addon.db or EMPTY
 	local groupBy = db.groupBy or "source"
-	local key = table.concat({
-		tostring(mapID),
-		groupBy,
-		tostring(db.showCollected),
-		tostring(db.showObtainableOnly),
-		tostring(db.showGlobal),
-		tostring(db.showUnusable),
-		hiddenSourcesHash(),
-	}, "|")
+	local key = cacheKey(mapID)
 
 	if cache.key == key then
 		return cache.groups, cache.zoneName, cache.mapID
