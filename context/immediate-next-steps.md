@@ -1,19 +1,19 @@
 # Immediate next steps
 
 ## Current state (2026-08-31)
-- **Phases 1-7 are merged to `main`.** PR #1 (vendor-location waypoints) is merged. The
-  stale `phase-buildout` and `feat/vendor-waypoints` local branches are deleted; delete the
-  remotes with
-  `git push origin --delete phase-buildout feat/vendor-waypoints`.
+- **Phases 1-8 done. Merged to `main`.** PR #1 (vendor waypoints) and PR #2 (context
+  reconcile) merged. Stale `phase-buildout` / `feat/vendor-waypoints` branches deleted.
 - All green offline:
   - `luacheck .` -> 0/0 (11 addon files)
   - `python tests/run.py` -> cold 73/73, warm 86/86
   - `python -m unittest discover -s tests -p "test_*.py"` -> 63 (35 generator + 23 mountdata + 5 toc)
-- **In-game: only smoke-touched.** The addon has loaded in the live client once
-  (SavedVariables written 2026-08-30, window moved/resized), so it loads and the frame
-  works — but the `context/phase8-ingame-checklist.md` sections A-G have NOT been worked
-  through. The load-bearing WoW API assumptions are still unverified in the client.
-- **Not released.** No git tag, no GitHub Release. TOC is at the default `## Version: 0.1.0`.
+- **In-game: validated 2026-08-31.** Worked through `context/phase8-ingame-checklist.md`
+  A-G in the live client — everything runs, no addon-code fixes were needed. The
+  load-bearing WoW API assumptions (`GetMountInfoByID` tuple order, HBD-Pins arg order,
+  the Settings metatable-proxy binding, `C_Reputation` / `C_MajorFactions` field names)
+  are now confirmed; see `context/wow-api-reference-cache.md`. Curated coords in
+  `Overrides.lua` remain eyeballed (display-only, per plan).
+- **Not released yet.** No git tag, no GitHub Release. TOC at the default `## Version: 0.1.0`.
 
 ## GitHub setup (pending — needed before the first release)
 - **`deploy` environment** — create it:
@@ -26,13 +26,12 @@
   environment + a `## X-Curse-Project-ID` line in the `.toc`. GitHub Release + zip work
   without them.
 
-## Next: phase 8 — in-game validation + first release
-1. Work through `context/phase8-ingame-checklist.md` (A-G) in the live client. Fix as you
-   go; re-run `.\run-tests.ps1` after every fix. Move verified APIs from PENDING to a dated
-   "validated" note in `context/wow-api-reference-cache.md`.
-2. When it all passes: bring `context/` fully up to date in the same commit
-   ([[bundle-context-updates-into-feature-commit]]).
-3. First release: **manual dispatch of `release.yml` with `version = 0.1.0`.**
+## Next: first release (0.1.0)
+1. Do the "GitHub setup" above (deploy environment + the Actions PR-creation toggle).
+2. **Manual dispatch of `release.yml` with `version = 0.1.0`** — bumps the `.toc`, tags
+   `v0.1.0`, runs the BigWigs packager, publishes the GitHub Release + zip.
+3. CurseForge upload only happens once the project exists and `CF_API_KEY` /
+   `## X-Curse-Project-ID` are wired.
 
 ## Deferred (not blockers — see `context/future-features.md`)
 - Achievement-reward mount -> zone resolver (~60 mounts sitting in `global`).

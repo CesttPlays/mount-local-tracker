@@ -1,15 +1,20 @@
 # Phase 8 — in-game validation checklist
 
-Nothing in phases 1-7 has run in the live client. The headless suite proves "no
-Lua threw and the wiring is connected"; it does NOT prove the WoW APIs behave as
-assumed, that frames lay out, or that the curated data is right.
+**PASSED 2026-08-31.** Worked through A-G in the live retail client — everything runs, no
+addon-code fixes were needed. The WoW API assumptions are confirmed (see
+`context/wow-api-reference-cache.md`). Kept as a regression checklist for future changes /
+client builds.
+
+The headless suite proves "no Lua threw and the wiring is connected"; it does NOT prove the
+WoW APIs behave as assumed, that frames lay out, or that the curated data is right — so
+re-run this in-game after any behavioural change.
 
 **Deploy:** copy the whole `Mount_Tracker_Local_Zones/` folder to
 `E:\Blizzard\World of Warcraft\_retail_\Interface\AddOns\Mount_Tracker_Local_Zones\`,
 then `/reload`. Re-run `.\run-tests.ps1` after every fix.
 
-Phases 1-7 are already on `main`. When it all passes: update `context/` in the same
-commit, then manual-dispatch `release.yml` with `version = 0.1.0`.
+Next: manual-dispatch `release.yml` with `version = 0.1.0` (after the `deploy` environment
++ Actions PR-creation toggle are set up).
 
 ---
 
