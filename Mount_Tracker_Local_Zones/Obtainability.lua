@@ -11,15 +11,18 @@ addon.Obtainability = Obtainability
 local SafeApiCall = addon.SafeApiCall
 local SafeApiCallMulti = addon.SafeApiCallMulti
 
+-- Curated-input lookup: Overrides wins over the generated MountData. See Core.lua.
+local pick = addon.Curated
+
 -- state -> { sortRank, colour } . Lower sortRank floats to the top of a group.
 local STATE = {
 	available         = { rank = 1, color = { 0.40, 0.85, 0.40 } },
 	farmable          = { rank = 2, color = { 1.00, 0.82, 0.00 } },
 	drop              = { rank = 3, color = { 0.87, 0.86, 0.81 } },
-	quest_gated       = { rank = 4, color = { 0.85, 0.55, 0.45 } },
-	rep_gated         = { rank = 5, color = { 0.85, 0.55, 0.45 } },
-	achievement_gated = { rank = 6, color = { 0.85, 0.55, 0.45 } },
-	reset_locked      = { rank = 7, color = { 0.60, 0.60, 0.62 } },
+	quest_gated       = { rank = 4, color = { 0.85, 0.55, 0.45 }, dim = true },
+	rep_gated         = { rank = 5, color = { 0.85, 0.55, 0.45 }, dim = true },
+	achievement_gated = { rank = 6, color = { 0.85, 0.55, 0.45 }, dim = true },
+	reset_locked      = { rank = 7, color = { 0.60, 0.60, 0.62 }, dim = true },
 	collected         = { rank = 8, color = { 0.50, 0.50, 0.50 } },
 }
 
@@ -30,20 +33,11 @@ function Obtainability.Color(state)
 	return entry.color[1], entry.color[2], entry.color[3]
 end
 
--- ============================================================================
--- Curated-input lookup (Overrides wins over the generated MountData)
--- ============================================================================
-
-local function pick(field, mountID)
-	local ov = addon.MountOverrides and addon.MountOverrides[field]
-	if ov and ov[mountID] ~= nil then
-		return ov[mountID]
-	end
-	local md = addon.MountData and addon.MountData[field]
-	return md and md[mountID]
+-- True for states drawn dimmed ("you can't get this here right now").
+function Obtainability.IsDimmed(state)
+	local e = STATE[state]
+	return e and e.dim or false
 end
-
-Obtainability.Input = pick
 
 -- ============================================================================
 -- Live player checks (each degrades to "unknown" if the API is missing)
@@ -65,8 +59,7 @@ local function ReputationProgress(factionID, threshold)
 	if C_Reputation and type(C_Reputation.GetFactionDataByID) == "function" then
 		local data = SafeApiCall(C_Reputation.GetFactionDataByID, factionID)
 		if type(data) == "table" and data.currentStanding then
-			local standing = data.currentReactionThreshold and data.currentStanding
-				or data.currentStanding
+			local standing = data.currentStanding
 			return standing, threshold, standing >= threshold, nil
 		end
 	end
@@ -111,9 +104,9 @@ local function FormatGold(copper)
 end
 
 local function VendorDetail(vendor, affordable)
-	local cost = vendor.cost or vendor[5]
-	local currencyID = vendor.currencyID or vendor[6]
-	local npc = vendor.npc or vendor.name
+	local cost = vendor.cost
+	local currencyID = vendor.currencyID
+	local npc = vendor.npc
 	local price
 	if not cost then
 		price = nil
@@ -152,8 +145,8 @@ function Obtainability.Evaluate(mountID, row)
 	-- 1. Reputation / renown gate.
 	local repFaction = pick("repFaction", mountID)
 	if type(repFaction) == "table" then
-		local factionID = repFaction.factionID or repFaction[1]
-		local threshold = repFaction.standing or repFaction[2]
+		local factionID = repFaction.factionID
+		local threshold = repFaction.standing
 		local current, needed, met, label = ReputationProgress(factionID, threshold)
 		if met == false then
 			local detail = label and ("%s / need %s"):format(label, tostring(needed))
@@ -166,8 +159,8 @@ function Obtainability.Evaluate(mountID, row)
 	-- 2. Vendor purchase.
 	local vendor = pick("vendor", mountID)
 	if type(vendor) == "table" then
-		local cost = vendor.cost or vendor[5]
-		local currencyID = vendor.currencyID or vendor[6]
+		local cost = vendor.cost
+		local currencyID = vendor.currencyID
 		local affordable
 		if not cost then
 			affordable = true
@@ -263,5 +256,16 @@ function Obtainability.AddTooltipLines(tooltip, mountID)
 	local note = pick("note", mountID)
 	if note and note ~= result.detail then
 		tooltip:AddLine(note, 0.7, 0.7, 0.7, true)
+	end
+
+	-- Dim instance-context line derived from the curated sub-category. Only shown
+	-- for instance-sourced mounts that have a subcat, and skipped when result.detail
+	-- already implies it (e.g. mentions "raid" / "dungeon").
+	local subcat = pick("subcat", mountID)
+	local SUBCAT_LABEL = { dungeon = "Dungeon drop", raid = "Raid drop", rare = "Rare drop" }
+	local subcatLine = row.source == "instance" and subcat and SUBCAT_LABEL[subcat]
+	if subcatLine
+		and not (result.detail and result.detail:lower():find(subcat:lower(), 1, true)) then
+		tooltip:AddLine(subcatLine, 0.5, 0.5, 0.5, true)
 	end
 end

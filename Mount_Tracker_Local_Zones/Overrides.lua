@@ -15,8 +15,8 @@ local _, addon = ...
 --   lockoutQuest [mountID] = questID            -- hidden quest that flags "done this reset"
 --   vendor       [mountID] = { npc = , uiMapID = , x = , y = , cost = , currencyID = }
 --                            (cost in copper when currencyID is nil, i.e. gold)
---   repFaction   [mountID] = { factionID, standing }  -- standing = renown level for a
---                            major faction, or the raw reputation value otherwise
+--   repFaction   [mountID] = { factionID = , standing = }  -- standing = renown level
+--                            for a major faction, or the raw reputation value otherwise
 --   note         [mountID] = "short tip"
 --
 -- mountID == C_MountJournal id == DB2 Mount.ID. uiMapID comes from
@@ -138,11 +138,11 @@ addon.MountOverrides = {
 	},
 
 	repFaction = {
-		[398] = { 1173, 42000 },  -- Ramkahen -- Exalted
-		[399] = { 1173, 42000 },  -- Ramkahen -- Exalted
-		[288] = { 1119, 42000 },  -- The Sons of Hodir -- Exalted
-		[1615] = { 2507, 25 },    -- Dragonscale Expedition -- Renown 25
-		[1653] = { 2511, 30 },    -- Iskaara Tuskarr -- Renown 30 (Brown War Ottuk)
+		[398] = { factionID = 1173, standing = 42000 },  -- Ramkahen -- Exalted
+		[399] = { factionID = 1173, standing = 42000 },  -- Ramkahen -- Exalted
+		[288] = { factionID = 1119, standing = 42000 },  -- The Sons of Hodir -- Exalted
+		[1615] = { factionID = 2507, standing = 25 },    -- Dragonscale Expedition -- Renown 25
+		[1653] = { factionID = 2511, standing = 30 },    -- Iskaara Tuskarr -- Renown 30 (Brown War Ottuk)
 	},
 
 	note = {

@@ -10,6 +10,8 @@ addon.MountModel = MountModel
 local SafeApiCall = addon.SafeApiCall
 local Obtainability = addon.Obtainability
 
+local Curated = addon.Curated -- Overrides wins over generated MountData; see Core.lua
+
 local EMPTY = {} -- shared read-only sentinel for "no list"
 
 -- Loop guard for the map parent-chain walk. Real WoW map trees are a handful of
@@ -20,27 +22,55 @@ local MAX_TREE_DEPTH = 15
 -- zone "available" count.
 local OBTAINABLE = { available = true, farmable = true, drop = true }
 
+-- The db fields that change which rows GetZoneMounts produces. The cache key is
+-- derived from exactly this list (plus the hiddenSources / hidden hashes), and
+-- Config.lua drives cache invalidation off the same list -- so covering a new
+-- filter means editing one list, not two hand-kept call sites. Every entry here
+-- must be a db field BuildRow / row.include (or the group/global split) reads.
+local CACHE_KEYS = {
+	"groupBy",
+	"showCollected",
+	"showObtainableOnly",
+	"showGlobal",
+	"showUnusable",
+	"showVendorIcons",
+}
+MountModel.CACHE_KEYS = CACHE_KEYS
+
 -- ============================================================================
 -- Source-type groups (groupBy == "source")
 -- ============================================================================
 
 -- display order + label. A mount whose source is missing / unknown falls to "other".
-local SOURCE_ORDER = { "instance", "drop", "rare", "vendor", "quest", "zonedrop", "worldevent", "profession", "achievement", "other" }
+-- This is the ONE canonical source-type list; Config.lua iterates the exported copy
+-- so its filter checkboxes always match the list's group headers.
+local SOURCE_ORDER = { "instance", "drop", "vendor", "quest", "zonedrop", "worldevent", "profession", "other" }
+MountModel.SOURCE_ORDER = SOURCE_ORDER
 local SOURCE_LABEL = {
 	instance = "Dungeon & Raid",
 	drop = "Rare Drop",
-	rare = "Rare Drop",
 	vendor = "Vendor",
 	quest = "Quest",
 	zonedrop = "Zone Drop",
 	worldevent = "World Event",
 	profession = "Profession",
-	achievement = "Achievement",
 	other = "Other",
 }
 local SOURCE_RANK = {}
 for index, key in ipairs(SOURCE_ORDER) do
 	SOURCE_RANK[key] = index
+end
+
+-- Label for a source-type string; unknown / nil -> "Other".
+function MountModel.SourceLabel(s)
+	return SOURCE_LABEL[s] or "Other"
+end
+
+-- Grouping bucket for a source-type string (groupBy == "source").
+-- Returns key, label, rank. nil / unknown source -> the "other" bucket.
+local function SourceBucket(source)
+	local s = source or "other"
+	return "s:" .. s, SOURCE_LABEL[s] or "Other", SOURCE_RANK[s] or SOURCE_RANK.other
 end
 
 -- ============================================================================
@@ -63,15 +93,18 @@ local EXPANSION_LABEL = {
 	[11] = "Midnight",
 }
 
-local function ExpansionLabel(id)
-	local n = tonumber(id)
+-- Grouping bucket for an expansion id (groupBy == "expansion").
+-- Returns key, label, rank. Classic-era / negative ids clamp to one "Classic"
+-- bucket; non-numeric / nil ids fall to the "Other" bucket, sorted last.
+local function ExpansionBucket(raw)
+	local n = tonumber(raw)
 	if not n then
-		return "Other"
+		return "e:x", "Other", 99
 	end
 	if n < 0 then
 		n = 0
 	end
-	return EXPANSION_LABEL[n] or "Other"
+	return "e:" .. n, EXPANSION_LABEL[n] or "Other", -n
 end
 
 -- ============================================================================
@@ -194,25 +227,19 @@ local function PlayerFactionIndex()
 	return nil
 end
 
--- Overrides win over the generated MountData for the same field.
-local function Curated(field, mountID)
-	local ov = addon.MountOverrides and addon.MountOverrides[field]
-	if ov and ov[mountID] ~= nil then
-		return ov[mountID]
-	end
-	local md = addon.MountData and addon.MountData[field]
-	return md and md[mountID]
-end
-
-MountModel.Curated = Curated
-
 local function PointFor(mountID)
 	local point = Curated("points", mountID)
 	return type(point) == "table" and point or nil
 end
 
--- { id, name, spellID, icon, isUsable, isCollected, source, subcat, expansion,
---   state, detail, sortRank, point } or nil when the mount is filtered out.
+-- Always returns a row for a real mount id; nil only when the id isn't a real /
+-- not-yet-loaded mount. row.include is the boolean "list this row" verdict --
+-- callers that only want the listed rows check it, while the zone summary folds
+-- over every row so collected / hidden mounts still count toward the zone totals.
+-- row = { id, name, spellID, icon, isUsable, isCollected, source,
+--         expansion, state, detail, sortRank, point, include }
+-- subcat is deliberately not on the row: its only reader is the tooltip, which
+-- pulls it straight from addon.Curated("subcat", id).
 local function BuildRow(mountID)
 	local name, spellID, icon, _, isUsable, _, _, _, _, _, isCollected =
 		addon.MountInfo(mountID)
@@ -222,30 +249,17 @@ local function BuildRow(mountID)
 	end
 
 	local db = addon.db or EMPTY
-
-	if isCollected and not db.showCollected then
-		return nil
-	end
-	if db.hidden and db.hidden[mountID] then
-		return nil
-	end
-
 	local source = Curated("source", mountID) or "other"
-	if db.hiddenSources and db.hiddenSources[source] then
-		return nil
-	end
 
-	-- Faction-specific mounts: hide the other faction's version.
+	-- Faction-specific mounts: the other faction's version is filtered from the
+	-- list (but still counted in the zone total).
+	local factionOK = true
 	local requiredFaction = Curated("faction", mountID)
 	if requiredFaction ~= nil then
 		local playerFaction = PlayerFactionIndex()
 		if playerFaction ~= nil and playerFaction ~= requiredFaction then
-			return nil
+			factionOK = false
 		end
-	end
-
-	if isUsable == false and not db.showUnusable then
-		return nil
 	end
 
 	local row = {
@@ -256,7 +270,6 @@ local function BuildRow(mountID)
 		isUsable = isUsable ~= false,
 		isCollected = isCollected and true or false,
 		source = source,
-		subcat = Curated("subcat", mountID),
 		expansion = Curated("expansion", mountID),
 		point = PointFor(mountID),
 	}
@@ -275,14 +288,32 @@ local function BuildRow(mountID)
 	row.detail = verdict.detail
 	row.sortRank = verdict.sortRank
 
-	if db.showObtainableOnly and not (row.isCollected or OBTAINABLE[row.state]) then
-		return nil
-	end
+	-- Count everything; list only what passes every active filter.
+	row.include = (db.showCollected or not row.isCollected)
+		and not (db.hidden and db.hidden[mountID])
+		and not (db.hiddenSources and db.hiddenSources[source])
+		and (db.showUnusable or row.isUsable)
+		and (row.isCollected or not db.showObtainableOnly or OBTAINABLE[row.state])
+		and factionOK or false
 
 	return row
 end
 
 MountModel.BuildRow = BuildRow
+
+-- Build a row for every id in a candidate list, dropping ids that aren't real
+-- mounts. Feeds both GroupRows (which lists the row.include rows) and the zone
+-- summary fold (which counts them all).
+local function BuildRows(ids)
+	local rows = {}
+	for _, mountID in ipairs(ids) do
+		local row = BuildRow(mountID)
+		if row then
+			rows[#rows + 1] = row
+		end
+	end
+	return rows
+end
 
 -- ============================================================================
 -- Grouping
@@ -310,26 +341,19 @@ local function FinishGroup(group)
 	end
 end
 
--- ids -> array of { key, label, icon, rows, total, collected, available, isGlobal }.
-local function GroupRows(ids, groupBy, isGlobal)
+-- Pre-built rows -> array of
+-- { key, label, icon, rows, total, collected, available, isGlobal }.
+-- Rows with include == false are skipped here (the zone summary still counts them).
+local function GroupRows(rows, groupBy, isGlobal)
 	local groups, byKey = {}, {}
 
-	for _, mountID in ipairs(ids) do
-		local row = BuildRow(mountID)
-		if row then
+	for _, row in ipairs(rows) do
+		if row.include then
 			local key, label, rank
 			if groupBy == "expansion" then
-				-- Clamp classic-era / unknown ids to one "Classic" bucket so a
-				-- stray -3 does not spawn a second Classic group.
-				local exp = tonumber(row.expansion)
-				exp = (exp and exp >= 0) and exp or (exp and 0) or nil
-				key = "e:" .. tostring(exp or "x")
-				label = row.expansion ~= nil and ExpansionLabel(exp) or "Other"
-				rank = exp and -exp or 99 -- newest first, unknown last
+				key, label, rank = ExpansionBucket(row.expansion)
 			else
-				key = "s:" .. row.source
-				label = SOURCE_LABEL[row.source] or "Other"
-				rank = SOURCE_RANK[row.source] or SOURCE_RANK.other
+				key, label, rank = SourceBucket(row.source)
 			end
 			if isGlobal then
 				key = "g:" .. key
@@ -421,27 +445,36 @@ local function hiddenSourcesHash()
 	return table.concat(keys, ",")
 end
 
--- Count total / collected / available across a flat candidate id list, for the
--- window summary line. Collected mounts are counted even when the list filters
--- them out.
-local function ZoneTally(ids)
-	local total, collected, available = 0, 0, 0
-	for _, mountID in ipairs(ids) do
-		local name, _, _, _, _, _, _, _, _, _, isCollected = addon.MountInfo(mountID)
-		if type(name) == "string" and name ~= "" then
-			total = total + 1
-			if isCollected then
-				collected = collected + 1
-			else
-				local verdict = Obtainability
-					and Obtainability.Evaluate(mountID, { isCollected = false, source = Curated("source", mountID) })
-				if verdict and verdict.state == "available" then
-					available = available + 1
-				end
-			end
+-- Sorted concat of the hidden mount ids (db.hidden). Same shape as
+-- hiddenSourcesHash: folding it into the cache key means hiding / restoring a
+-- mount changes the key on its own, no separate InvalidateCache() call needed.
+local function hiddenHash()
+	local db = addon.db
+	if not (db and db.hidden) then
+		return ""
+	end
+	local keys = {}
+	for id, value in pairs(db.hidden) do
+		if value then
+			keys[#keys + 1] = id
 		end
 	end
-	return total, collected, available
+	table.sort(keys)
+	return table.concat(keys, ",")
+end
+
+-- The GetZoneMounts cache key: mapID + every CACHE_KEYS db field + the two
+-- hidden-set hashes. Covers exactly what BuildRow / row.include and the
+-- group/global split depend on.
+local function cacheKey(mapID)
+	local db = addon.db or EMPTY
+	local parts = { tostring(mapID) }
+	for _, k in ipairs(CACHE_KEYS) do
+		parts[#parts + 1] = tostring(db[k])
+	end
+	parts[#parts + 1] = hiddenSourcesHash()
+	parts[#parts + 1] = hiddenHash()
+	return table.concat(parts, "|")
 end
 
 -- Returns: groups, zoneName, mapID.
@@ -451,24 +484,27 @@ function MountModel.GetZoneMounts()
 
 	local db = addon.db or EMPTY
 	local groupBy = db.groupBy or "source"
-	local key = table.concat({
-		tostring(mapID),
-		groupBy,
-		tostring(db.showCollected),
-		tostring(db.showObtainableOnly),
-		tostring(db.showGlobal),
-		tostring(db.showUnusable),
-		hiddenSourcesHash(),
-	}, "|")
+	local key = cacheKey(mapID)
 
 	if cache.key == key then
 		return cache.groups, cache.zoneName, cache.mapID
 	end
 
 	local ids = CandidateSet(GetMapChain(mapID))
-	local groups = GroupRows(ids, groupBy, false)
+	local rows = BuildRows(ids)
+	local groups = GroupRows(rows, groupBy, false)
 
-	local zoneTotal, zoneCollected, zoneAvailable = ZoneTally(ids)
+	-- Zone summary: fold over every real row, filters or not. Collected / hidden /
+	-- filtered mounts still count toward the zone totals.
+	local zoneTotal, zoneCollected, zoneAvailable = 0, 0, 0
+	for _, row in ipairs(rows) do
+		zoneTotal = zoneTotal + 1
+		if row.isCollected then
+			zoneCollected = zoneCollected + 1
+		elseif row.state == "available" then
+			zoneAvailable = zoneAvailable + 1
+		end
+	end
 
 	if db.showGlobal then
 		local shown = {}
@@ -481,7 +517,7 @@ function MountModel.GetZoneMounts()
 				globalIDs[#globalIDs + 1] = id
 			end
 		end
-		for _, group in ipairs(GroupRows(globalIDs, groupBy, true)) do
+		for _, group in ipairs(GroupRows(BuildRows(globalIDs), groupBy, true)) do
 			groups[#groups + 1] = group
 		end
 	end
@@ -510,8 +546,12 @@ function MountModel.GetZoneMounts()
 	return groups, zoneName, mapID
 end
 
--- Re-evaluate obtainability for the mounts already in the cached list, without a
--- full re-derivation. Backs NEW_MOUNT_ADDED / MOUNT_JOURNAL_USABILITY_CHANGED.
+-- In-place refresh of obtainability for the rows already in the cached list;
+-- never adds or removes rows. Only valid when the candidate set is unchanged
+-- (MOUNT_JOURNAL_USABILITY_CHANGED). If a cached row's membership actually
+-- changed -- BuildRow now returns nil or a row with include == false -- we can't
+-- fix that in place, so drop the cache and let the next GetZoneMounts rebuild
+-- rather than leave a stale row on screen.
 function MountModel.RefreshCachedStates()
 	RefreshAccountCounts()
 
@@ -521,13 +561,15 @@ function MountModel.RefreshCachedStates()
 	for _, group in ipairs(cache.groups) do
 		for _, row in ipairs(group.rows) do
 			local fresh = BuildRow(row.id)
-			if fresh then
-				row.state = fresh.state
-				row.detail = fresh.detail
-				row.sortRank = fresh.sortRank
-				row.isUsable = fresh.isUsable
-				row.isCollected = fresh.isCollected
+			if not fresh or not fresh.include then
+				MountModel.InvalidateCache()
+				return
 			end
+			row.state = fresh.state
+			row.detail = fresh.detail
+			row.sortRank = fresh.sortRank
+			row.isUsable = fresh.isUsable
+			row.isCollected = fresh.isCollected
 		end
 		FinishGroup(group)
 	end

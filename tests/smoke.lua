@@ -203,6 +203,22 @@ step("obtainability reads the Overrides seed", function()
     check("affordable Overrides vendor mount -> 'available'", buy.state == "available", buy.state)
 end)
 
+-- WS10: subcat surfaces as a dim tooltip line for a subcat'd instance mount.
+step("tooltip: a subcat'd instance mount gets a 'Raid drop' context line", function()
+    -- 168 Fiery Warhorse: MountData source = "instance", subcat = "raid".
+    local lines = {}
+    local tip = { AddLine = function(_, text) lines[#lines + 1] = tostring(text) end }
+    addon.Obtainability.AddTooltipLines(tip, 168)
+    local sawSubcat = false
+    for _, line in ipairs(lines) do
+        if line:find("Raid drop", 1, true) or line:find("Dungeon drop", 1, true) then
+            sawSubcat = true
+        end
+    end
+    check("AddTooltipLines emitted a 'Raid drop' line for mount 168", sawSubcat,
+        table.concat(lines, " | "))
+end)
+
 -- ---------------------------------------------------------------------------
 -- Slash commands
 -- ---------------------------------------------------------------------------
@@ -249,6 +265,106 @@ step("Filter by source: unchecking 'Show Vendor' hides vendor mounts", function(
     addon.RefreshWindow()
     Harness.runTimers()
 end)
+
+-- ---------------------------------------------------------------------------
+-- WS4: one source-type model (MountModel.SOURCE_ORDER is canonical)
+-- ---------------------------------------------------------------------------
+step("source model: SOURCE_ORDER exists and every entry has a label", function()
+    local order = addon.MountModel.SOURCE_ORDER
+    check("addon.MountModel.SOURCE_ORDER is a non-empty list",
+        type(order) == "table" and #order > 0)
+    check("addon.MountModel.SourceLabel is a function",
+        type(addon.MountModel.SourceLabel) == "function")
+    for _, s in ipairs(order or {}) do
+        local label = addon.MountModel.SourceLabel(s)
+        check(("SOURCE_ORDER entry %q has a non-empty label"):format(tostring(s)),
+            type(label) == "string" and label ~= "")
+    end
+end)
+
+step("source model: Config registers one source filter per SOURCE_ORDER entry", function()
+    local order = addon.MountModel.SOURCE_ORDER or {}
+    local filterCount = 0
+    for key in pairs(Stub.data.settings) do
+        if type(key) == "string" and key:match("^show_") then
+            filterCount = filterCount + 1
+        end
+    end
+    check(("Config source-filter count (%d) == #SOURCE_ORDER (%d)"):format(filterCount, #order),
+        filterCount == #order)
+end)
+
+-- ---------------------------------------------------------------------------
+-- WS6: single-pass zone scan -- zone tally is filter-independent
+-- ---------------------------------------------------------------------------
+if SCENARIO == "warm" then
+    step("zone tally: zoneTotal / zoneCollected survive a showCollected flip", function()
+        -- warm fixture zone 84 (Stormwind City): stubbed zone mounts are
+        -- 9 (collected), 11 (uncollected, affordable vendor), 18 (uncollected,
+        -- rep-gated). Toggling "show collected" changes which rows list, never
+        -- the zone totals.
+        local model = addon.MountModel
+        Stub.data.zone, Stub.data.mapID = "Stormwind City", 84
+
+        addon.db.showCollected = false
+        model.InvalidateCache()
+        model.GetZoneMounts()
+        local off = model.Summary()
+
+        addon.db.showCollected = true
+        model.InvalidateCache()
+        model.GetZoneMounts()
+        local on = model.Summary()
+
+        addon.db.showCollected = false
+        model.InvalidateCache()
+
+        check(("zoneTotal equal across the flip (off=%s on=%s)")
+            :format(tostring(off.zoneTotal), tostring(on.zoneTotal)),
+            off.zoneTotal == on.zoneTotal and off.zoneTotal > 0)
+        check(("zoneCollected equal across the flip (off=%s on=%s)")
+            :format(tostring(off.zoneCollected), tostring(on.zoneCollected)),
+            off.zoneCollected == on.zoneCollected)
+        check("fixture zone counts at least one collected mount", on.zoneCollected >= 1)
+    end)
+end
+
+-- ---------------------------------------------------------------------------
+-- WS8: NEW_MOUNT_ADDED drops a just-collected row (RefreshCachedStates never
+-- silently keeps a stale row)
+-- ---------------------------------------------------------------------------
+if SCENARIO == "warm" then
+    step("stale rows: collecting a listed mount removes it on NEW_MOUNT_ADDED", function()
+        local model = addon.MountModel
+        Stub.data.zone, Stub.data.mapID = "Stormwind City", 84
+        addon.db.showCollected = false
+        model.InvalidateCache()
+
+        local function listed(mountID)
+            local groups = model.GetZoneMounts()
+            for _, group in ipairs(groups) do
+                for _, row in ipairs(group.rows) do
+                    if row.id == mountID then return true end
+                end
+            end
+            return false
+        end
+
+        check("mount 18 is listed while uncollected", listed(18))
+
+        -- Flip the stub to collected and fire the real event; the debounced
+        -- membership refresh must invalidate the cache so the row leaves.
+        Harness.collectMount(18)
+        Harness.runTimers()
+
+        check("mount 18 is gone from GetZoneMounts after NEW_MOUNT_ADDED",
+            not listed(18))
+
+        -- restore fixture state for the steps that follow
+        Stub.data.mountInfo[18].isCollected = false
+        model.InvalidateCache()
+    end)
+end
 
 step("minimap button toggle (ApplyMinimapButton both ways)", function()
     addon.db.showMinimapButton = false

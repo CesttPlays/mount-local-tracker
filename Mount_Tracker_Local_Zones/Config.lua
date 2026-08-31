@@ -6,23 +6,24 @@ local _, addon = ...
 
 local categoryID
 
--- Source types the "Filter by source" section exposes, in display order, with
--- the same labels the tracker list uses for its group headers.
-local SOURCE_FILTERS = {
-	{ "instance", "Dungeon & Raid" },
-	{ "drop", "Rare Drop" },
-	{ "vendor", "Vendor" },
-	{ "quest", "Quest" },
-	{ "zonedrop", "Zone Drop" },
-	{ "worldevent", "World Event" },
-	{ "profession", "Profession" },
-	{ "achievement", "Achievement" },
-	{ "other", "Other" },
-}
+-- The "Filter by source" section iterates addon.MountModel.SOURCE_ORDER (the one
+-- canonical source-type list) so its checkboxes always match the tracker list's
+-- group headers. Labels come from addon.MountModel.SourceLabel.
 
-local SOURCE_LABEL = {}
-for _, entry in ipairs(SOURCE_FILTERS) do
-	SOURCE_LABEL[entry[1]] = entry[2]
+-- Settings whose value is folded into the MountModel cache key (see
+-- MountModel.CACHE_KEYS). Changing any of them changes the tracker list content.
+local CACHE_AFFECTING = {}
+for _, key in ipairs((addon.MountModel and addon.MountModel.CACHE_KEYS) or {}) do
+	CACHE_AFFECTING[key] = true
+end
+
+local function InvalidateAndRefresh()
+	if addon.MountModel then
+		addon.MountModel.InvalidateCache()
+	end
+	if addon.RefreshWindow then
+		addon.RefreshWindow()
+	end
 end
 
 -- React only to what each setting actually affects.
@@ -31,23 +32,37 @@ local function OnSettingChanged(key)
 		if addon.ApplyMinimapButton then
 			addon.ApplyMinimapButton()
 		end
-	elseif key == "showMapIcons" or key == "showMinimapIcons" or key == "showVendorIcons" then
-		if addon.Map then
-			addon.Map.Rebuild()
-		end
-	elseif key == "windowStyle" then
+		return
+	end
+
+	if key == "windowStyle" then
 		if addon.NotifyWindowStyleChanged then
 			addon.NotifyWindowStyleChanged()
 		end
-	else
-		-- groupBy / showCollected / showObtainableOnly / showUnusable / showGlobal
-		-- / a hiddenSources toggle: the list content changes, so drop the cache.
-		if addon.MountModel then
-			addon.MountModel.InvalidateCache()
+		return
+	end
+
+	-- Map-only toggles: they change world/minimap icon rendering, nothing in the
+	-- tracker list.
+	if key == "showMapIcons" or key == "showMinimapIcons" then
+		if addon.Map then
+			addon.Map.Rebuild()
 		end
-		if addon.RefreshWindow then
-			addon.RefreshWindow()
-		end
+		return
+	end
+
+	-- showVendorIcons feeds row.point for vendor mounts (part of the model cache
+	-- key now) *and* drives the map pins, so it needs both a rebuild and a
+	-- cache invalidation. It falls through to the CACHE_AFFECTING check below.
+	if key == "showVendorIcons" and addon.Map then
+		addon.Map.Rebuild()
+	end
+
+	-- groupBy / showCollected / showObtainableOnly / showUnusable / showGlobal /
+	-- showVendorIcons or a hiddenSources toggle: the list content changes, so
+	-- drop the model cache and refresh the window.
+	if key == "hiddenSources" or CACHE_AFFECTING[key] then
+		InvalidateAndRefresh()
 	end
 end
 
@@ -130,8 +145,8 @@ local sourceFilterProxy = setmetatable({}, {
 
 local function AddSourceFilters(category, layout)
 	AddSection(layout, "Filter by source")
-	for _, entry in ipairs(SOURCE_FILTERS) do
-		local sourceType, label = entry[1], entry[2]
+	for _, sourceType in ipairs(addon.MountModel.SOURCE_ORDER) do
+		local label = addon.MountModel.SourceLabel(sourceType)
 		local proxyKey = "show_" .. sourceType
 		local setting = Settings.RegisterAddOnSetting(
 			category, "MTLZ_" .. proxyKey, proxyKey, sourceFilterProxy, "boolean", "Show " .. label, true
@@ -159,8 +174,8 @@ local HIDDEN_HEADER_HEIGHT = 24
 local FALLBACK_ICON = "Interface\\ICONS\\Ability_Mount_RidingHorse"
 
 local function SourceBucketLabel(mountID)
-	local source = addon.MountModel and addon.MountModel.Curated("source", mountID)
-	return SOURCE_LABEL[source or "other"] or "Other"
+	local source = addon.Curated("source", mountID)
+	return addon.MountModel.SourceLabel(source or "other")
 end
 
 local function BuildHiddenHeader(header)
