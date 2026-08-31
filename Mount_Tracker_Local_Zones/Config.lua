@@ -6,24 +6,9 @@ local _, addon = ...
 
 local categoryID
 
--- Source types the "Filter by source" section exposes, in display order, with
--- the same labels the tracker list uses for its group headers.
-local SOURCE_FILTERS = {
-	{ "instance", "Dungeon & Raid" },
-	{ "drop", "Rare Drop" },
-	{ "vendor", "Vendor" },
-	{ "quest", "Quest" },
-	{ "zonedrop", "Zone Drop" },
-	{ "worldevent", "World Event" },
-	{ "profession", "Profession" },
-	{ "achievement", "Achievement" },
-	{ "other", "Other" },
-}
-
-local SOURCE_LABEL = {}
-for _, entry in ipairs(SOURCE_FILTERS) do
-	SOURCE_LABEL[entry[1]] = entry[2]
-end
+-- The "Filter by source" section iterates addon.MountModel.SOURCE_ORDER (the one
+-- canonical source-type list) so its checkboxes always match the tracker list's
+-- group headers. Labels come from addon.MountModel.SourceLabel.
 
 -- React only to what each setting actually affects.
 local function OnSettingChanged(key)
@@ -130,8 +115,8 @@ local sourceFilterProxy = setmetatable({}, {
 
 local function AddSourceFilters(category, layout)
 	AddSection(layout, "Filter by source")
-	for _, entry in ipairs(SOURCE_FILTERS) do
-		local sourceType, label = entry[1], entry[2]
+	for _, sourceType in ipairs(addon.MountModel.SOURCE_ORDER) do
+		local label = addon.MountModel.SourceLabel(sourceType)
 		local proxyKey = "show_" .. sourceType
 		local setting = Settings.RegisterAddOnSetting(
 			category, "MTLZ_" .. proxyKey, proxyKey, sourceFilterProxy, "boolean", "Show " .. label, true
@@ -160,7 +145,7 @@ local FALLBACK_ICON = "Interface\\ICONS\\Ability_Mount_RidingHorse"
 
 local function SourceBucketLabel(mountID)
 	local source = addon.Curated("source", mountID)
-	return SOURCE_LABEL[source or "other"] or "Other"
+	return addon.MountModel.SourceLabel(source or "other")
 end
 
 local function BuildHiddenHeader(header)

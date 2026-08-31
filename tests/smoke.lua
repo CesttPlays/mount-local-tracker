@@ -250,6 +250,34 @@ step("Filter by source: unchecking 'Show Vendor' hides vendor mounts", function(
     Harness.runTimers()
 end)
 
+-- ---------------------------------------------------------------------------
+-- WS4: one source-type model (MountModel.SOURCE_ORDER is canonical)
+-- ---------------------------------------------------------------------------
+step("source model: SOURCE_ORDER exists and every entry has a label", function()
+    local order = addon.MountModel.SOURCE_ORDER
+    check("addon.MountModel.SOURCE_ORDER is a non-empty list",
+        type(order) == "table" and #order > 0)
+    check("addon.MountModel.SourceLabel is a function",
+        type(addon.MountModel.SourceLabel) == "function")
+    for _, s in ipairs(order or {}) do
+        local label = addon.MountModel.SourceLabel(s)
+        check(("SOURCE_ORDER entry %q has a non-empty label"):format(tostring(s)),
+            type(label) == "string" and label ~= "")
+    end
+end)
+
+step("source model: Config registers one source filter per SOURCE_ORDER entry", function()
+    local order = addon.MountModel.SOURCE_ORDER or {}
+    local filterCount = 0
+    for key in pairs(Stub.data.settings) do
+        if type(key) == "string" and key:match("^show_") then
+            filterCount = filterCount + 1
+        end
+    end
+    check(("Config source-filter count (%d) == #SOURCE_ORDER (%d)"):format(filterCount, #order),
+        filterCount == #order)
+end)
+
 step("minimap button toggle (ApplyMinimapButton both ways)", function()
     addon.db.showMinimapButton = false
     addon.ApplyMinimapButton()

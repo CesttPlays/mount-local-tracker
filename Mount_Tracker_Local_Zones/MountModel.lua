@@ -27,22 +27,28 @@ local OBTAINABLE = { available = true, farmable = true, drop = true }
 -- ============================================================================
 
 -- display order + label. A mount whose source is missing / unknown falls to "other".
-local SOURCE_ORDER = { "instance", "drop", "rare", "vendor", "quest", "zonedrop", "worldevent", "profession", "achievement", "other" }
+-- This is the ONE canonical source-type list; Config.lua iterates the exported copy
+-- so its filter checkboxes always match the list's group headers.
+local SOURCE_ORDER = { "instance", "drop", "vendor", "quest", "zonedrop", "worldevent", "profession", "other" }
+MountModel.SOURCE_ORDER = SOURCE_ORDER
 local SOURCE_LABEL = {
 	instance = "Dungeon & Raid",
 	drop = "Rare Drop",
-	rare = "Rare Drop",
 	vendor = "Vendor",
 	quest = "Quest",
 	zonedrop = "Zone Drop",
 	worldevent = "World Event",
 	profession = "Profession",
-	achievement = "Achievement",
 	other = "Other",
 }
 local SOURCE_RANK = {}
 for index, key in ipairs(SOURCE_ORDER) do
 	SOURCE_RANK[key] = index
+end
+
+-- Label for a source-type string; unknown / nil -> "Other".
+function MountModel.SourceLabel(s)
+	return SOURCE_LABEL[s] or "Other"
 end
 
 -- ============================================================================
