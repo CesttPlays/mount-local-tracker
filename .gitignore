@@ -65,6 +65,12 @@ Mount_Tracker_Local_Zones/Libs/*
 .claude/settings.json
 .claude/worktrees/
 
+# Shared Claude Code skills are machine-local directory junctions to
+# "D:\Propio\GitHub\World of Warcraft add-ons\.claude\skills\" (see that folder's README.md).
+# Only wow-addon-companion is a real, committed skill in this repo.
+.claude/skills/*
+!.claude/skills/wow-addon-companion/
+
 # MCP server config (contains machine-specific absolute paths)
 .mcp.json
 
