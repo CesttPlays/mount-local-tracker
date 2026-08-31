@@ -11,6 +11,9 @@ addon.Obtainability = Obtainability
 local SafeApiCall = addon.SafeApiCall
 local SafeApiCallMulti = addon.SafeApiCallMulti
 
+-- Curated-input lookup: Overrides wins over the generated MountData. See Core.lua.
+local pick = addon.Curated
+
 -- state -> { sortRank, colour } . Lower sortRank floats to the top of a group.
 local STATE = {
 	available         = { rank = 1, color = { 0.40, 0.85, 0.40 } },
@@ -29,21 +32,6 @@ function Obtainability.Color(state)
 	local entry = STATE[state] or STATE.drop
 	return entry.color[1], entry.color[2], entry.color[3]
 end
-
--- ============================================================================
--- Curated-input lookup (Overrides wins over the generated MountData)
--- ============================================================================
-
-local function pick(field, mountID)
-	local ov = addon.MountOverrides and addon.MountOverrides[field]
-	if ov and ov[mountID] ~= nil then
-		return ov[mountID]
-	end
-	local md = addon.MountData and addon.MountData[field]
-	return md and md[mountID]
-end
-
-Obtainability.Input = pick
 
 -- ============================================================================
 -- Live player checks (each degrades to "unknown" if the API is missing)

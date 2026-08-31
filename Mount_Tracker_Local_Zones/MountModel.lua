@@ -10,6 +10,8 @@ addon.MountModel = MountModel
 local SafeApiCall = addon.SafeApiCall
 local Obtainability = addon.Obtainability
 
+local Curated = addon.Curated -- Overrides wins over generated MountData; see Core.lua
+
 local EMPTY = {} -- shared read-only sentinel for "no list"
 
 -- Loop guard for the map parent-chain walk. Real WoW map trees are a handful of
@@ -193,18 +195,6 @@ local function PlayerFactionIndex()
 	end
 	return nil
 end
-
--- Overrides win over the generated MountData for the same field.
-local function Curated(field, mountID)
-	local ov = addon.MountOverrides and addon.MountOverrides[field]
-	if ov and ov[mountID] ~= nil then
-		return ov[mountID]
-	end
-	local md = addon.MountData and addon.MountData[field]
-	return md and md[mountID]
-end
-
-MountModel.Curated = Curated
 
 local function PointFor(mountID)
 	local point = Curated("points", mountID)

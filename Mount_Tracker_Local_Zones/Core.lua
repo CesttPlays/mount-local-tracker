@@ -138,6 +138,23 @@ local function Debounced(delay, fn)
 end
 
 -- ============================================================================
+-- Curated data
+-- ============================================================================
+
+-- Overrides.lua wins over the generated MountData for the same [field][id].
+-- Both tables load after Core, so the lookups resolve lazily at call time.
+local function Curated(field, id)
+	local ov = addon.MountOverrides and addon.MountOverrides[field]
+	if ov and ov[id] ~= nil then
+		return ov[id]
+	end
+	local md = addon.MountData and addon.MountData[field]
+	return md and md[id]
+end
+
+addon.Curated = Curated
+
+-- ============================================================================
 -- Mount helpers (shared by the tracker window and the map pins)
 -- ============================================================================
 
@@ -255,8 +272,7 @@ end
 -- so this is what the "... (vendor)" waypoint actions and the opt-in vendor map
 -- pins aim at. Returns nil when there is no vendor entry or it has no position.
 local function VendorLocation(mountID)
-	local vendor = (addon.MountOverrides and addon.MountOverrides.vendor and addon.MountOverrides.vendor[mountID])
-		or (addon.MountData and addon.MountData.vendor and addon.MountData.vendor[mountID])
+	local vendor = addon.Curated("vendor", mountID)
 	if type(vendor) ~= "table" then
 		return nil
 	end
@@ -281,8 +297,7 @@ local function ShowMountMenu(frame)
 		return
 	end
 
-	local point = (addon.MountOverrides and addon.MountOverrides.points and addon.MountOverrides.points[mountID])
-		or (addon.MountData and addon.MountData.points and addon.MountData.points[mountID])
+	local point = addon.Curated("points", mountID)
 	local vendorPoint, vendorNPC = VendorLocation(mountID)
 	local isCollected = select(11, MountInfo(mountID))
 

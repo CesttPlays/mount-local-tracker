@@ -159,7 +159,7 @@ local HIDDEN_HEADER_HEIGHT = 24
 local FALLBACK_ICON = "Interface\\ICONS\\Ability_Mount_RidingHorse"
 
 local function SourceBucketLabel(mountID)
-	local source = addon.MountModel and addon.MountModel.Curated("source", mountID)
+	local source = addon.Curated("source", mountID)
 	return SOURCE_LABEL[source or "other"] or "Other"
 end
 
