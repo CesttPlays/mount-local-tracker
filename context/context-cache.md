@@ -13,8 +13,9 @@
   place of achievements.
 - Solo developer, new to Lua and the WoW API, plans to publish (CurseForge/WoWInterface).
   Release-quality; no debug spam on by default.
-- Status: **phases 1-8 done, merged to `main`** (PR #1 vendor waypoints + PR #2 context
-  reconcile; stale `phase-buildout` / `feat/vendor-waypoints` branches deleted). All green
+- Status: **phases 1-9 done, merged to `main`** (PR #1 vendor waypoints + PR #2 context
+  reconcile + PR #3 phase-9 code-quality refactor; stale `phase-buildout` /
+  `feat/vendor-waypoints` branches deleted). All green
   offline. **Validated in-game 2026-08-31** (checklist A-G, no addon-code fixes needed) —
   the load-bearing WoW API assumptions are confirmed. Not released yet — no tag, no GitHub
   Release, TOC at default `0.1.0`; needs the `deploy` environment + Actions PR-creation

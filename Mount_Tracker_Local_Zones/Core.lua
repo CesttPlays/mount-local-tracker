@@ -283,6 +283,7 @@ end)
 -- debounce.
 local RequestMembershipRefresh = Debounced(0.5, function()
 	if addon.MountModel then
+		addon.MountModel.RefreshAccountCounts()
 		addon.MountModel.InvalidateCache()
 	end
 	if addon.RefreshWindow then

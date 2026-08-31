@@ -405,6 +405,35 @@ if SCENARIO == "warm" then
         Stub.data.mountInfo[18].isCollected = false
         model.InvalidateCache()
     end)
+
+    step("account count refreshes on NEW_MOUNT_ADDED, not only on usability", function()
+        local model = addon.MountModel
+        Stub.data.zone, Stub.data.mapID = "Stormwind City", 84
+        model.InvalidateCache()
+        model.GetZoneMounts()
+
+        -- Prime with the current account count, then collect a fresh mount and
+        -- fire ONLY NEW_MOUNT_ADDED (collectMount does exactly that). The summary
+        -- account total must go up without any usability event -- proving the
+        -- recount moved from RefreshCachedStates to the membership path.
+        model.RefreshAccountCounts()
+        local before = model.Summary().accountCollected or 0
+
+        Stub.data.mountInfo[9999] = { name = "Test Steed", spellID = 1, isCollected = false }
+        Stub.data.mountIDs[#Stub.data.mountIDs + 1] = 9999
+        Stub.data.mountInfo[9999].isCollected = true
+        Harness.collectMount(9999)
+        Harness.runTimers()
+
+        local after = model.Summary().accountCollected or 0
+        check(("account collected rose on NEW_MOUNT_ADDED (before=%s after=%s)")
+            :format(tostring(before), tostring(after)), after == before + 1)
+
+        -- restore fixture state
+        Stub.data.mountIDs[#Stub.data.mountIDs] = nil
+        Stub.data.mountInfo[9999] = nil
+        model.InvalidateCache()
+    end)
 end
 
 step("minimap button toggle (ApplyMinimapButton both ways)", function()

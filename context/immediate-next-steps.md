@@ -1,8 +1,9 @@
 # Immediate next steps
 
 ## Current state (2026-08-31)
-- **Phases 1-8 done. Merged to `main`.** PR #1 (vendor waypoints) and PR #2 (context
-  reconcile) merged. Stale `phase-buildout` / `feat/vendor-waypoints` branches deleted.
+- **Phases 1-9 done. Merged to `main`.** PR #1 (vendor waypoints), PR #2 (context
+  reconcile) and PR #3 (phase-9 code-quality refactor) merged. Stale `phase-buildout` /
+  `feat/vendor-waypoints` branches deleted.
 - All green offline:
   - `luacheck .` -> 0/0 (11 addon files)
   - `python tests/run.py` -> cold 73/73, warm 86/86

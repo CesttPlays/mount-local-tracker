@@ -11,6 +11,7 @@ local SafeApiCall = addon.SafeApiCall
 local Obtainability = addon.Obtainability
 
 local Curated = addon.Curated -- Overrides wins over generated MountData; see Core.lua
+local GetCurrentMapID = addon.GetCurrentMapID -- defined in Core.lua
 
 local EMPTY = {} -- shared read-only sentinel for "no list"
 
@@ -110,13 +111,6 @@ end
 -- ============================================================================
 -- Zone resolution
 -- ============================================================================
-
-local function GetCurrentMapID()
-	if type(C_Map) ~= "table" then
-		return nil
-	end
-	return SafeApiCall(C_Map.GetBestMapForUnit, "player")
-end
 
 -- Every uiMapID from the player's map up through its parents, closest first.
 local function GetMapChain(mapID)
@@ -410,6 +404,8 @@ local function RefreshAccountCounts()
 	accountCache.total, accountCache.collected = total, collected
 end
 
+MountModel.RefreshAccountCounts = RefreshAccountCounts
+
 -- ============================================================================
 -- Public: the grouped zone list
 -- ============================================================================
@@ -553,8 +549,8 @@ end
 -- fix that in place, so drop the cache and let the next GetZoneMounts rebuild
 -- rather than leave a stale row on screen.
 function MountModel.RefreshCachedStates()
-	RefreshAccountCounts()
-
+	-- Account collected/total only move on NEW_MOUNT_ADDED, not on a usability
+	-- event; the membership-refresh path (Core.lua) recounts them.
 	if not cache.groups then
 		return
 	end

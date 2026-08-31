@@ -31,7 +31,7 @@ behaviour lists an explicit in-game check for the maintainer.
 | 001 | Rebuild map pins when a list-filter option changes | P1 | S | — | DONE (branch worktree-execute-plans; offline suites green; needs in-game check) |
 | 002 | Add a direct unit-test suite for the obtainability engine | P1 | M | — | TODO |
 | 003 | Pre-filter `Map.Compute` to positioned mounts only | P2 | S | — | DONE (branch worktree-execute-plans; offline suites green; needs in-game check) |
-| 004 | Doc + small-debt cleanup (phase-9 status, `GetCurrentMapID` dup, account-count scan) | P2 | S | — | TODO |
+| 004 | Doc + small-debt cleanup (phase-9 status, `GetCurrentMapID` dup, account-count scan) | P2 | S | — | DONE (branch worktree-execute-plans; offline suites green; needs in-game check) |
 | 005 | SPIKE: achievement-reward → zone resolver for `global` mounts | P3 | L | — | TODO |
 
 Status values: TODO | IN PROGRESS | DONE | BLOCKED (one-line reason) | REJECTED (one-line rationale)

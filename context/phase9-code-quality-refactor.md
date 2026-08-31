@@ -1,6 +1,10 @@
 # Phase 9 — Code-quality refactor plan
 
-Status: **proposed, not started**
+Status: **SHIPPED 2026-08-31** — all workstreams WS1–WS10 landed in commit
+`0878181` ("Phase 9: code-quality refactor (#3)"). Kept as the record of what
+changed and the in-game checklist for future regressions.
+In-game checklist (section 4): not separately recorded — re-run after the next
+deploy.
 Author: thermo-nuclear code-quality review, 2026-08-31
 Scope: `Mount_Tracker_Local_Zones/` Lua modules (+ generator/tests where noted).
 All changes are **behaviour-preserving** unless a workstream explicitly flags a

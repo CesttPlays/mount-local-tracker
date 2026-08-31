@@ -22,7 +22,7 @@ Folder `Mount_Tracker_Local_Zones/` (spelled correctly), SavedVariables
 - `C_MountJournal.GetMountIDs()`, `GetMountInfoByID(id)` →
   `name, spellID, icon, isActive, isUsable, sourceType, isFavorite, isFactionSpecific,
   faction, shouldHideOnChar, isCollected, mountID, isSteadyFlight` — **tuple order is
-  load-bearing**, still unverified in-game (see `context/wow-api-reference-cache.md`).
+  load-bearing**; validated in-game 2026-08-31 (see `context/wow-api-reference-cache.md`).
 - `GetMountInfoExtraByID(id)` → `creatureDisplayInfoID, description, source, isSelfMount,
   mountTypeID, ...`.
 - The journal loads early — still guard it (`IsMountApiReady` + retry in `Core.lua`), but no
@@ -63,4 +63,5 @@ zones, ≥250 refs, ≥150 global, within 60–160% of the previous file. See th
 
 ## In-game checks
 `/mtlz` (toggle), `/mtlz list`, `/mtlz config`, `/mtlz map`, `/mtlz debug`, `/mtlz reset`.
-Everything is still unvalidated in the live client — see `context/phase8-ingame-checklist.md`.
+Validated in-game 2026-08-31 (phase-8 checklist A–G passed); re-run
+`context/phase8-ingame-checklist.md` after any behavioural change.
