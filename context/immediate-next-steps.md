@@ -2,7 +2,9 @@
 
 ## Current state (2026-08-31)
 - **Phases 1-7 are merged to `main`.** PR #1 (vendor-location waypoints) is merged. The
-  stale `phase-buildout` and `feat/vendor-waypoints` branches have been deleted.
+  stale `phase-buildout` and `feat/vendor-waypoints` local branches are deleted; delete the
+  remotes with
+  `git push origin --delete phase-buildout feat/vendor-waypoints`.
 - All green offline:
   - `luacheck .` -> 0/0 (11 addon files)
   - `python tests/run.py` -> cold 73/73, warm 86/86
