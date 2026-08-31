@@ -7,9 +7,10 @@
   still collect in the player's current zone, each row saying whether you can get it now
   (vendor / affordable), are short on reputation, or the weekly farm is up. Follows the player
   as they change zones.
-- Sibling project: `achivement-local-tracker` (`D:\Propio\GitHub\achivement-local-tracker`),
-  built first by the same solo dev. This project mirrors its architecture, tests, CI and
-  release flow — `C_MountJournal` mounts in place of achievements.
+- Sibling project: `achivement-local-tracker` (sibling folder under
+  `D:\Propio\GitHub\World of Warcraft add-ons\`), built first by the same solo dev. This
+  project mirrors its architecture, tests, CI and release flow — `C_MountJournal` mounts in
+  place of achievements.
 - Solo developer, new to Lua and the WoW API, plans to publish (CurseForge/WoWInterface).
   Release-quality; no debug spam on by default.
 - Status: **phases 1-7 built on branch `phase-buildout`**, all green offline. Not yet
@@ -113,7 +114,7 @@
   988 global. Variant-map duplication inflates the zone count (per-expansion copies of the
   same real zone) — harmless, player is on one map id at a time.
 - **DB2 access, 2026-08-30**: wago.tools + general internet were down but the Blizzard CDN
-  was up, so `wow.tools.local` (`D:\Propio\GitHub\wow.tools.local`, `_run/config.json` ->
+  was up, so `wow.tools.local` (`D:\Propio\GitHub\World of Warcraft add-ons\wow.tools.local`, `_run/config.json` ->
   `wowFolder=E:\Blizzard\World of Warcraft`) ran offline against the local CASC install:
   start `_run/wow.tools.local.exe`, wait for `:5000`, then
   `GET http://localhost:5000/dbc/export/csv?name=<Table>&build=<build>&locale=enUS`; drop the

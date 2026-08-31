@@ -1,70 +1,66 @@
 ---
 name: wow-addon-companion
-description: Conventions and working style for this World of Warcraft addon repo. Use when coding, debugging, reviewing, or refactoring the addon — Lua files, TOC/XML definitions, WoW API calls, event flow, saved variables, and addon lifecycle logic.
+description: Repo-specific overlay for mount-local-tracker — this addon's data model, C_MountJournal API surface, obtainability logic, and datamine pipeline. Use when coding, debugging, or reviewing this addon. Read the shared wow-addon-family skill first for the common conventions.
 ---
 
-# WoW Addon Companion
+# WoW Addon Companion — mount-local-tracker
 
-Project-aware coding companion for this WoW addon: **Mount Tracker: Local Zones** — a
-zone-aware window listing the mounts you can still collect where you're standing.
-Sibling project to `achivement-local-tracker`, which the same author built first; that
-repo is the reference implementation for architecture, tests, CI, and release flow.
+**Mount Tracker: Local Zones** — a zone-aware, obtainability-aware window listing the mounts
+you can still collect where you're standing: whether you can get one now (vendor /
+affordable), are short on reputation, or the weekly farm is up.
 
-## Source of truth
-- Treat `.toc`, `.xml`, and `.lua` files as the primary implementation truth.
-- Reason from the repo context first (`context/` files), then from WoW API knowledge.
-- The addon's TOC `## Interface` line pins the game build being targeted — check it before assuming an API exists.
+This skill is the **overlay**. The shared baseline — architecture, `SafeApiCall` pattern,
+change discipline, smoke tests, `context/` continuity, git guardrails, the family
+display-name rule — is in the **`wow-addon-family`** skill; read it first. Full current
+state is in `context/context-cache.md`. Second addon in the family; when in doubt, look at
+how `achivement-local-tracker` solved the same thing.
 
-## WoW API safety
-- Before using a WoW API function that isn't already in the code, verify it against
-  https://warcraft.wiki.gg (or https://wowprogramming.com/docs/api.html) — API names and
-  signatures change between game builds. Record confirmed calls in
-  `context/wow-api-reference-cache.md` after in-game validation, and reuse that cache.
-- Use the defensive pattern established in `Core.lua`: verify the function exists
-  (`type(fn) == "function"`), call it via `pcall`, require the expected result type, and
-  only then treat the API as ready (`SafeApiCall` / `SafeApiCallMulti`). Don't assume a
-  single function name exists across all client builds; fall back where the code already does.
-- Mount collection state comes from `C_MountJournal` — `GetMountIDs()`, `GetMountInfoByID(id)`
-  (returns `name, spellID, icon, isActive, isUsable, sourceType, isFavorite, isFactionSpecific,
-  faction, shouldHideOnChar, isCollected, mountID, isSteadyFlight`), `GetMountInfoExtraByID(id)`
-  (`creatureDisplayInfoID, description, source, isSelfMount, mountTypeID, ...`). The journal
-  loads early in the session but still guard it — no heavy readiness-retry loop is needed
-  (unlike the achievement API in the sibling repo).
-- Prefer zone-based checks (`C_Map.GetBestMapForUnit("player")` + parent chain) as the
-  locale-independent zone key. `GetRealZoneText` / `GetZoneText` are for display only.
+Folder `Mount_Tracker_Local_Zones/` (spelled correctly), SavedVariables
+`MountTrackerLocalZonesDB`, slash `/mtlz`, TOC `## Interface: 120100` (retail Midnight 12.1).
 
-## Data pipeline
-- There is **no** WoW API mapping mounts to zones. The mapping is datamined offline by
-  `tools/generate_mount_zones.py` into `Mount_Tracker_Local_Zones/MountData.lua` (generated —
-  do not hand-edit). Hand-tuning lives in `Overrides.lua`, merged at runtime.
-- Generator resolution passes: instance drops (`JournalEncounterItem` → item → spell →
-  `Mount.SourceSpellID`, `JournalInstance.MapID` → uiMap), achievement-reward mounts (reuse
-  the achievement→zone logic), and `Mount.SourceText_lang` zone-name matching. Everything
-  unresolved goes to a curated `Overrides.lua` or the `global` bucket.
+## C_MountJournal API surface
+- `C_MountJournal.GetMountIDs()`, `GetMountInfoByID(id)` →
+  `name, spellID, icon, isActive, isUsable, sourceType, isFavorite, isFactionSpecific,
+  faction, shouldHideOnChar, isCollected, mountID, isSteadyFlight` — **tuple order is
+  load-bearing**, still unverified in-game (see `context/wow-api-reference-cache.md`).
+- `GetMountInfoExtraByID(id)` → `creatureDisplayInfoID, description, source, isSelfMount,
+  mountTypeID, ...`.
+- The journal loads early — still guard it (`IsMountApiReady` + retry in `Core.lua`), but no
+  heavy readiness-retry loop is needed (unlike the achievement API in the sibling repo).
+- Obtainability reads live: `C_Reputation`, `C_MajorFactions`, `C_CurrencyInfo`, `GetMoney`,
+  `GetAchievementInfo`, `C_QuestLog.IsQuestFlaggedCompleted`.
+- Tooltip: `GameTooltip:SetMountBySpellID`. Events: `NEW_MOUNT_ADDED`,
+  `MOUNT_JOURNAL_USABILITY_CHANGED`.
 
-## Change discipline
-- Prefer the smallest correct change over a broad rewrite.
-- Avoid unrelated cleanup or refactors the user didn't ask for.
-- Deliver patch-ready, targeted diffs. Do not echo full changed files back — end with a
-  per-file line-range briefing (see the user's global instructions).
-- When a change alters runtime behavior, state the assumption or caveat and tell the user
-  what to verify in-game (`/mtlz`, `/mtlz list`, `/reload`, the tracker window).
-- Flag likely API limitations or build-version assumptions up front when uncertain.
+## Data model
+- **MountData.lua** — GENERATED. `{ build, updated, zones=[uiMapID]->{mountID},
+  source=[mountID]->str, subcat, expansion, faction=[mountID]->0|1, points={},
+  achievementID={}, repFaction={}, vendor={}, global={mountID,...} }`. `points` /
+  `achievementID` / `repFaction` / `vendor` are emitted **empty** — curated in Overrides.
+- **Overrides.lua** — `addon.MountOverrides = { add, remove, source, subcat, points, faction,
+  expansion, dropChance, lockout, lockoutQuest, vendor, repFaction, note }`. Seeded with
+  ~30 well-known mounts.
+- **Obtainability.lua** — pure `Evaluate(mountID, row) -> { state, detail, sortRank }`;
+  states: `collected | available | farmable | drop | quest_gated | rep_gated |
+  achievement_gated | reset_locked`.
+- **MountModel.lua** — `CandidateSet` / `GlobalCandidateSet` / `BuildRow` (6 filters) /
+  `GroupRows(ids, groupBy)` (`db.groupBy` = `"source"` default | `"expansion"`) /
+  `GetZoneMounts` (7-part cache key) / `Summary`.
+- Vendor waypoints: `vendor` entries carry `{ npc, uiMapID, x, y }` (0–10000 point scale);
+  `db.showVendorIcons` (default **true**) pins vendor-purchase mounts at the merchant.
 
-## Headless smoke tests
-- After editing any addon `.lua`, run `python tests/run.py` (or `.\run-tests.ps1`). It loads
-  every file in TOC order under a fake WoW client (`tests/stub.lua`) and drives the full
-  lifecycle + all slash commands, asserting only that nothing throws. Fast; runs in CI too.
-- It catches load errors, `nil` calls, typos, bad vararg wiring, and obvious logic blow-ups —
-  nothing about how Blizzard's real APIs behave, and nothing visual. See `tests/README.md`.
-- Passing smoke is **not** "tested": [[no-push-until-tested]] still means an in-game
-  `/reload`. Smoke just makes regressions cheap to catch before that.
-- To turn a smoke check into a real behavioural assertion, add fixture data to the `warm`
-  block in `tests/init.lua` and assert in `tests/smoke.lua`.
+## Datamine pipeline
+`tools/generate_mount_zones.py` (stdlib only). **`Mount.SourceTypeEnum` is too noisy** (big
+"Legacy" bucket, `-1` on new mounts) — parse **`Mount.SourceText_lang`** structured labels
+instead (`Zone:` / `Location:` / `Vendor:` / `Drop:` / `Quest:` / `Faction:` /
+`Profession:` / `World Event:` / `(Alliance)` / `(Horde)`). Resolution: instance drops via
+`JournalEncounterItem` → item teach-spell → `Mount.SourceSpellID` → `JournalInstance.MapID`
+→ uiMapID (link verified on 12.1.0.69497); `Zone:`/`Location:` name match against
+`UiMap.Name_lang` (Type ∈ {3 Zone, 6 Orphan}); expansion from `ItemSparse.ExpansionID`;
+faction from the `(Alliance)`/`(Horde)` tag; everything else → `global`. Sanity gate: ≥40
+zones, ≥250 refs, ≥150 global, within 60–160% of the previous file. See the
+`refresh-gamedata` skill for the run + offline fallback.
 
-## Session continuity
-- `context/context-cache.md` is the persistent project memory; `context/immediate-next-steps.md`
-  holds the current priority work and `context/future-features.md` holds deferred ideas.
-- Immediate next steps always take priority over future features. Record future ideas, don't
-  implement them ahead of the current blocker.
-- Keep `context/` current — see the `update-context` skill for when and how.
+## In-game checks
+`/mtlz` (toggle), `/mtlz list`, `/mtlz config`, `/mtlz map`, `/mtlz debug`, `/mtlz reset`.
+Everything is still unvalidated in the live client — see `context/phase8-ingame-checklist.md`.

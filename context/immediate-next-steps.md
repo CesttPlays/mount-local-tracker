@@ -8,19 +8,12 @@
   - `python -m unittest discover -s tests -p "test_*.py"` -> 63 (35 generator + 23 mountdata + 5 toc)
 
 ## Next: phase 8 — in-game validation + first release
-1. Copy `Mount_Tracker_Local_Zones/` to
-   `E:\Blizzard\World of Warcraft\_retail_\Interface\AddOns\Mount_Tracker_Local_Zones\`,
-   `/reload`, and work through **`context/phase8-ingame-checklist.md`** across >=3 zones,
-   a city, and a dungeon zone.
-2. Fix whatever the checklist turns up (most likely: `GetMountInfoByID` tuple order, the
-   Settings source-filter proxy binding, HBD-Pins arg order, phase-6 coords). Re-run the
-   offline suites after each fix.
-3. When it passes: bring `context/` fully up to date, merge `phase-buildout` -> `main`.
-4. Before the first release, set up on GitHub: the **`deploy` environment**, the
+1. When it passes: bring `context/` fully up to date, merge `phase-buildout` -> `main`.
+2. Before the first release, set up on GitHub: the **`deploy` environment**, the
    **"Allow GitHub Actions to create and approve pull requests"** repo setting (for the
    refresh workflow), and — when the CurseForge project exists — the `CF_API_KEY` secret in
    `deploy` + a `## X-Curse-Project-ID` line in the `.toc`.
-5. First release: **manual dispatch of `release.yml` with `version = 0.1.0`.**
+3. First release: **manual dispatch of `release.yml` with `version = 0.1.0`.**
 
 ## Build order (done)
 1. Skeleton — DONE. TOC, Core.lua, empty MountData.lua, Overrides stub, Mechanic.lua, Libs,

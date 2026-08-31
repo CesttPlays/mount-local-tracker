@@ -19,7 +19,7 @@ Steps done so far
    - Data strategy: hybrid — Python DB2 generator resolves what it can, the rest is curated in Overrides.lua + a global bucket.
    - Naming: folder Mount_Tracker_Local_Zones, SavedVariables MountTrackerLocalZonesDB, slash /mtlz.
    - List grouping: a groupBy dropdown setting (by source type / by expansion, extensible).
-3. Created the scaffolding in D:\Propio\GitHub\mount-local-tracker\:
+3. Created the scaffolding in the mount-local-tracker repo (now at D:\Propio\GitHub\World of Warcraft add-ons\mount-local-tracker\):
    - .claude/settings.json, .claude/settings.local.json (luacheck hook repoCP)
    - .claude/skills/ — thermo-nuclear-code-quality-review (verbatim), update-context (verbatim), wow-addon-companion (rewritten for mounts)
    - CLAUDE.local.md (adapted: install path, /mtlz, sibling pointer)
@@ -28,7 +28,7 @@ Steps done so far
 
 Sources checked
 
-Sibling repo (D:\Propio\GitHub\achivement-local-tracker): full architecture, generator, tests description, context files, Claude config, CurseForge copy.
+Sibling repo (achivement-local-tracker, sibling folder under D:\Propio\GitHub\World of Warcraft add-ons\): full architecture, generator, tests description, context files, Claude config, CurseForge copy.
 
 Web:
 - missingmounts.com (https://www.missingmounts.com/) — home / purpose
