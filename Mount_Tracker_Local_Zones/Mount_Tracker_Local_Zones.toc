@@ -18,6 +18,7 @@ MountData.lua
 Overrides.lua
 Obtainability.lua
 MountModel.lua
+MountActions.lua
 ListView.xml
 ListView.lua
 Window.lua
