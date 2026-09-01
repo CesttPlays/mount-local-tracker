@@ -49,9 +49,15 @@ for _, key in ipairs({
     "InitializeWindow", "ToggleWindow", "RefreshWindow", "PrintZoneList",
     "IsWindowShown", "ResetWindow", "defaults",
     "SetupConfig", "OpenConfig", "SetupMinimapButton", "ApplyMinimapButton",
+    "L",
 }) do
     check("addon." .. key .. " is defined", addon[key] ~= nil)
 end
+
+check("addon.L falls back to the key",
+    addon.L and addon.L["a phrase with no translation"] == "a phrase with no translation")
+check("addon.L resolves a known base phrase",
+    addon.L["Hide this mount"] == "Hide this mount")
 
 check("/mtlz slash handler registered",
     type(_G.SlashCmdList) == "table" and type(_G.SlashCmdList.MTLZ) == "function")

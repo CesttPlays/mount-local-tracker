@@ -30,6 +30,8 @@ read_globals = {
     "GetTime", "C_AddOns",
     -- Zone / location / map
     "GetRealZoneText", "GetZoneText", "GetSubZoneText", "C_Map", "UnitFactionGroup",
+    -- Localization (AceLocale-3.0 reads GetLocale; the addon depends on it indirectly)
+    "GetLocale",
     -- Mount journal
     "C_MountJournal", "ToggleCollectionsJournal", "MountJournal_SelectByMountID",
     -- Spells / tooltip / combat

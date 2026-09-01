@@ -1,5 +1,10 @@
 local addonName, addon = ...
 
+-- Localization layer. Every user-facing string resolves through addon.L (an
+-- AceLocale-3.0 table); missing translations fall back to the English key.
+local L = LibStub("AceLocale-3.0"):GetLocale(addonName)
+addon.L = L
+
 -- ============================================================================
 -- Saved variables
 -- ============================================================================
