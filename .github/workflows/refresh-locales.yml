@@ -1,0 +1,72 @@
+name: Refresh locales
+
+# Pulls approved translations from CurseForge Localization into
+# Mount_Tracker_Local_Zones/Locales/<locale>.lua and opens a pull request.
+# Never merges on its own -- the diff is reviewed and validated in-game (client
+# set to that language) first. Mirrors refresh-mount-data.yml.
+#
+# Dispatch-only until the CurseForge project exists (needs CF_PROJECT_ID, the
+# ## X-Curse-Project-ID .toc line, and the CF_API_KEY secret in the "deploy"
+# environment). Uncomment the schedule block once that is in place.
+
+on:
+  workflow_dispatch:
+  # schedule:
+  #   - cron: "37 9 * * 2"  # Tuesdays ~09:37 UTC, just after refresh-mount-data
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    environment: deploy          # CF_API_KEY lives here (same as release.yml)
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Pull translations from CurseForge
+        env:
+          CF_API_KEY: ${{ secrets.CF_API_KEY }}
+          CF_PROJECT_ID: ${{ vars.CF_PROJECT_ID }}
+        run: python tools/pull_locale_translations.py
+
+      - name: Lua syntax check
+        run: |
+          sudo apt-get update && sudo apt-get install -y --no-install-recommends lua5.1
+          for f in Mount_Tracker_Local_Zones/Locales/*.lua; do
+            lua5.1 -e "assert(loadfile('$f'))" || exit 1
+          done
+
+      - name: Validate locale-file shape
+        run: python -m unittest discover -s tests -p "test_locales.py" -v
+
+      - name: Open pull request
+        uses: peter-evans/create-pull-request@v6
+        with:
+          branch: chore/refresh-locales
+          add-paths: Mount_Tracker_Local_Zones/Locales/*.lua
+          title: "chore: refresh translations from CurseForge"
+          commit-message: |
+            chore: refresh translations from CurseForge
+
+            Regenerated Locales/*.lua from CurseForge Localization by the
+            refresh-locales workflow. Base language (enUS) is not touched.
+
+            Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
+          body: |
+            Automated refresh of `Mount_Tracker_Local_Zones/Locales/*.lua`
+            from CurseForge Localization. Only per-language files change;
+            `Locales/enUS.lua` is the source of truth and is left alone.
+
+            **Before merging:** skim the diff, then log in with the client set to
+            each changed language (or `/console locale <code>` + `/reload`) and
+            eyeball the tracker window, `/mtlz config`, the right-click menu and
+            the minimap tooltip. Watch for clipped text and broken `%s` / `%d`.
+
+            Generated with Claude Code
+          labels: automated

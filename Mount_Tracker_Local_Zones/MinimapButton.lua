@@ -1,4 +1,5 @@
 local addonName, addon = ...
+local L = addon.L
 
 -- Minimap launcher button (LibDataBroker + LibDBIcon).
 
@@ -9,7 +10,7 @@ local dataObject
 if LDB then
 	dataObject = LDB:NewDataObject(addonName, {
 		type = "launcher",
-		text = "Mount Tracker",
+		text = L["Mount Tracker"],
 		icon = "Interface\\ICONS\\Ability_Mount_RidingHorse",
 		OnClick = function(_, button)
 			if button == "RightButton" then
@@ -21,9 +22,9 @@ if LDB then
 			end
 		end,
 		OnTooltipShow = function(tooltip)
-			tooltip:AddLine("Mount Tracker: Local Zones")
-			tooltip:AddLine("|cffeeeeeeLeft-click|r  toggle the tracker", 1, 1, 1)
-			tooltip:AddLine("|cffeeeeeeRight-click|r  options", 1, 1, 1)
+			tooltip:AddLine(L["Mount Tracker: Local Zones"])
+			tooltip:AddLine(L["Left-click to toggle the tracker"], 1, 1, 1)
+			tooltip:AddLine(L["Right-click for options"], 1, 1, 1)
 		end,
 	})
 end

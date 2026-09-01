@@ -348,7 +348,29 @@ function Stub.install()
 
     -- LibStub + just enough of the embedded libs that Map / MinimapButton run
     -- their real code paths instead of bailing at the `nil` guard.
+    local aceLocaleApps = {}
     local libs = {
+        -- Faithful-enough AceLocale-3.0: `= true` resolves to the key; the stub
+        -- client is always enUS, so non-default locales get no write proxy;
+        -- missing keys fall back to the key string (silent default locale).
+        ["AceLocale-3.0"] = {
+            NewLocale = function(_, app, locale, isDefault)
+                local t = aceLocaleApps[app]
+                if not t then
+                    t = setmetatable({}, { __index = function(_, k) return k end })
+                    aceLocaleApps[app] = t
+                end
+                if locale ~= "enUS" and not isDefault then return nil end
+                return setmetatable({}, {
+                    __newindex = function(_, k, v) rawset(t, k, v == true and k or v) end,
+                    __index = function(_, k) return t[k] end,
+                })
+            end,
+            GetLocale = function(_, app)
+                return aceLocaleApps[app]
+                    or setmetatable({}, { __index = function(_, k) return k end })
+            end,
+        },
         ["HereBeDragons-Pins-2.0"] = {
             RemoveAllWorldMapIcons = function() D.worldPins = 0 end,
             RemoveAllMinimapIcons = function() D.minimapPins = 0 end,
@@ -377,6 +399,7 @@ function Stub.install()
     _G.GetSubZoneText = function() return D.subZone end
     _G.GetMinimapZoneText = function() return D.subZone end
     _G.UnitFactionGroup = function() return D.faction end
+    _G.GetLocale = function() return "enUS" end
 
     -- Map
     _G.C_Map = {

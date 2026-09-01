@@ -10,6 +10,8 @@ local _, addon = ...
 --   points       [mountID] = { uiMapID, x*10000, y*10000 }
 --   faction      [mountID] = 0 (Horde) | 1 (Alliance)
 --   expansion    [mountID] = expansionID
+--   achievementID[mountID] = achievementID      -- mount is a reward for finishing that
+--                            achievement; drives the "Achievement needed" obtainability line
 --   dropChance   [mountID] = "~1%"              -- curated display string
 --   lockout      [mountID] = "daily" | "weekly"
 --   lockoutQuest [mountID] = questID            -- hidden quest that flags "done this reset"
@@ -68,6 +70,19 @@ addon.MountOverrides = {
 
 	faction = {},
 	expansion = {},
+
+	-- Achievement-reward links the generator's auto-resolver (plan 006) can't
+	-- make confidently. [mountID] = achievementID; feeds the "Achievement needed"
+	-- obtainability line for uncollected mounts.
+	--
+	-- Empty by design: the generator links every mount with a clean RewardItemID
+	-- FK or an unambiguous title match (~183 on build 12.1.0.69497). The mounts
+	-- it leaves unlinked are collection metas ("Mountacular", "A Horde of
+	-- Hoofbeats"), Allied-race unlocks and PvP feats -- each has an Alliance/Horde
+	-- title pair or sits in a global category, so there is no single achievement
+	-- to gate on and they correctly stay in the Global bucket. Add an entry here
+	-- only for a specific mount you want the tooltip to call out.
+	achievementID = {},
 
 	dropChance = {
 		[265] = "guaranteed off the rare",

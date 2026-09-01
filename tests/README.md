@@ -12,6 +12,7 @@ shape of the shipped `MountData.lua`. It is **not** a substitute for an in-game
 | Generator | `python -m unittest discover -s tests -p test_generator.py` | the pure transforms in `tools/generate_mount_zones.py` (SourceText parse, zone-name match, instance loot-table join, sanity thresholds, Lua rendering) |
 | Mount data | `python -m unittest discover -s tests -p test_mountdata.py` | loads `MountData.lua` + `Overrides.lua` under a bare Lua state and asserts every table's shape (zone→mountID lists, `source` values, faction ∈ {0,1}, in-range points, `global` never also in a zone, Overrides `lockout`/`vendor`/`repFaction` well-formed) |
 | TOC | `python -m unittest discover -s tests -p test_toc.py` | every `.toc` line exists on disk, `## Interface` is 5-6 digits, `## SavedVariables` is declared in `.luacheckrc`, no orphan `.lua`/`.xml`, load order (Core → MountData → MountModel → Window) |
+| Locales | `python -m unittest discover -s tests -p test_locales.py` | `Locales/*.lua` filename set, `.toc` wiring + load order, `enUS.lua` key/value shape, no duplicate keys, translations only add known keys, `%s`/`%d` placeholder parity |
 
 ## Run
 
@@ -41,6 +42,11 @@ Two scenarios, each in a fresh Lua state:
 The `warm` run additionally asserts that `/mtlz list` names the seeded uncollected
 mount and the seeded global mount — a guard against the model silently regressing
 to an early return.
+
+The `Locales/*.lua` files load through the harness like any other addon file;
+`tests/stub.lua` fakes `AceLocale-3.0` (the `= true` idiom resolves to the key,
+missing keys fall back to the key string) and returns `GetLocale() == "enUS"`, so
+`enUS.lua` populates `addon.L` and the 10 translation stubs early-return.
 
 ## What it does NOT cover — still needs an in-game `/reload`
 

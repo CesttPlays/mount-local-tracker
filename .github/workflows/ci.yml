@@ -79,3 +79,6 @@ jobs:
 
       - name: Check TOC / packaging consistency
         run: python -m unittest discover -s tests -p "test_toc.py" -v
+
+      - name: Check locale-file shape
+        run: python -m unittest discover -s tests -p "test_locales.py" -v

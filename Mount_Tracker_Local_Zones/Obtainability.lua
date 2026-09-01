@@ -1,4 +1,5 @@
 local _, addon = ...
+local L = addon.L
 
 -- Works out *how obtainable* an uncollected mount is right now: can you buy it
 -- today, are you short on reputation, is the weekly farm already done, or is it
@@ -52,7 +53,7 @@ local function ReputationProgress(factionID, threshold)
 		local data = SafeApiCall(C_MajorFactions.GetMajorFactionData, factionID)
 		if type(data) == "table" and data.renownLevel then
 			local level = data.renownLevel
-			return level, threshold, level >= threshold, ("Renown %d"):format(level)
+			return level, threshold, level >= threshold, L["Renown %d"]:format(level)
 		end
 	end
 
@@ -111,7 +112,7 @@ local function VendorDetail(vendor, affordable)
 	if not cost then
 		price = nil
 	elseif currencyID then
-		price = ("%s |cffffffff(currency)|r"):format(cost)
+		price = L["%s |cffffffff(%s)|r"]:format(cost, L["currency"])
 	else
 		price = FormatGold(cost)
 	end
@@ -124,7 +125,7 @@ local function VendorDetail(vendor, affordable)
 	end
 	local detail = table.concat(parts, " \194\183 ")
 	if detail == "" then
-		detail = affordable and "available from a vendor" or "vendor"
+		detail = affordable and L["available from a vendor"] or L["vendor"]
 	end
 	return detail
 end
@@ -149,8 +150,8 @@ function Obtainability.Evaluate(mountID, row)
 		local threshold = repFaction.standing
 		local current, needed, met, label = ReputationProgress(factionID, threshold)
 		if met == false then
-			local detail = label and ("%s / need %s"):format(label, tostring(needed))
-				or ("%s / %s reputation"):format(tostring(current or "?"), tostring(needed))
+			local detail = label and L["%s / need %s"]:format(label, tostring(needed))
+				or L["%s / %s reputation"]:format(tostring(current or "?"), tostring(needed))
 			return { state = "rep_gated", detail = detail, sortRank = STATE.rep_gated.rank }
 		end
 		-- rep met: fall through, likely a vendor purchase now
@@ -183,7 +184,7 @@ function Obtainability.Evaluate(mountID, row)
 		local _, achName = SafeApiCallMulti(GetAchievementInfo, achievementID)
 		return {
 			state = "achievement_gated",
-			detail = type(achName) == "string" and achName ~= "" and achName or "achievement reward",
+			detail = type(achName) == "string" and achName ~= "" and achName or L["achievement reward"],
 			sortRank = STATE.achievement_gated.rank,
 		}
 	end
@@ -196,7 +197,7 @@ function Obtainability.Evaluate(mountID, row)
 		if done then
 			return {
 				state = "reset_locked",
-				detail = ("%s \194\183 done this reset"):format(lockout),
+				detail = L["%s \194\183 done this reset"]:format(lockout),
 				sortRank = STATE.reset_locked.rank,
 			}
 		end
@@ -241,15 +242,15 @@ function Obtainability.AddTooltipLines(tooltip, mountID)
 	tooltip:AddLine(" ")
 	local r, g, b = Obtainability.Color(result.state)
 	local labels = {
-		available = "Available now",
-		farmable = "Farmable now",
-		rep_gated = "Reputation needed",
-		achievement_gated = "Achievement needed",
-		quest_gated = "Quest needed",
-		reset_locked = "Locked this reset",
-		drop = "Not yet collected",
+		available = L["Available now"],
+		farmable = L["Farmable now"],
+		rep_gated = L["Reputation needed"],
+		achievement_gated = L["Achievement needed"],
+		quest_gated = L["Quest needed"],
+		reset_locked = L["Locked this reset"],
+		drop = L["Not yet collected"],
 	}
-	tooltip:AddLine(labels[result.state] or "Not yet collected", r, g, b)
+	tooltip:AddLine(labels[result.state] or L["Not yet collected"], r, g, b)
 	if result.detail then
 		tooltip:AddLine(result.detail, 0.9, 0.9, 0.9, true)
 	end
@@ -262,7 +263,7 @@ function Obtainability.AddTooltipLines(tooltip, mountID)
 	-- for instance-sourced mounts that have a subcat, and skipped when result.detail
 	-- already implies it (e.g. mentions "raid" / "dungeon").
 	local subcat = pick("subcat", mountID)
-	local SUBCAT_LABEL = { dungeon = "Dungeon drop", raid = "Raid drop", rare = "Rare drop" }
+	local SUBCAT_LABEL = { dungeon = L["Dungeon drop"], raid = L["Raid drop"], rare = L["Rare drop"] }
 	local subcatLine = row.source == "instance" and subcat and SUBCAT_LABEL[subcat]
 	if subcatLine
 		and not (result.detail and result.detail:lower():find(subcat:lower(), 1, true)) then

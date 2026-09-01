@@ -162,7 +162,8 @@ class TestMountData(unittest.TestCase):
 class TestOverrides(unittest.TestCase):
     EXPECTED_SUB_TABLES = (
         "add", "remove", "source", "subcat", "points", "faction", "expansion",
-        "dropChance", "lockout", "lockoutQuest", "vendor", "repFaction", "note",
+        "achievementID", "dropChance", "lockout", "lockoutQuest", "vendor",
+        "repFaction", "note",
     )
 
     @classmethod
@@ -196,6 +197,14 @@ class TestOverrides(unittest.TestCase):
     def test_override_faction_values_are_zero_or_one(self):
         for _mount_id, side in self.ov["faction"].items():
             self.assertIn(side, (0, 1))
+
+    def test_override_achievementid_values_are_ints(self):
+        # [mountID] = achievementID, both positive ints. Consumed by
+        # Obtainability.Evaluate via addon.Curated("achievementID", ...).
+        for mount_id, ach_id in self.ov["achievementID"].items():
+            self.assertIsInstance(mount_id, int, f"achievementID key {mount_id!r} is not an int")
+            self.assertIsInstance(ach_id, int, f"mount {mount_id} achievementID {ach_id!r} is not an int")
+            self.assertGreater(ach_id, 0, f"mount {mount_id} achievementID {ach_id} is not positive")
 
     def test_lockout_values_are_daily_or_weekly(self):
         for mount_id, cadence in self.ov["lockout"].items():
