@@ -170,6 +170,163 @@ class TestInstanceMounts(unittest.TestCase):
         self.assertEqual(d.instance_mounts(), {})
 
 
+class TestNormalizeAchievementTitle(unittest.TestCase):
+    def test_case_and_trailing_punctuation_collapse_to_the_same_key(self):
+        self.assertEqual(
+            gen.normalize_achievement_title("For The Horde!"),
+            gen.normalize_achievement_title("For the Horde"),
+        )
+
+    def test_difficulty_suffix_keeps_the_title_distinct(self):
+        self.assertNotEqual(
+            gen.normalize_achievement_title("Glory of the Ulduar Raider"),
+            gen.normalize_achievement_title("Glory of the Ulduar Raider (25 player)"),
+        )
+
+
+class TestAchievementTitleFromText(unittest.TestCase):
+    def test_reads_the_label_and_stops_at_the_next_label(self):
+        self.assertEqual(
+            gen.achievement_title_from_text(
+                "Achievement: Glory of the Ulduar Raider Category: Dungeons & Raids"
+            ),
+            "glory of the ulduar raider",
+        )
+
+    def test_no_achievement_label_is_none(self):
+        self.assertIsNone(gen.achievement_title_from_text("Vendor: Bob Zone: Durotar"))
+
+
+class TestAchievementForMount(unittest.TestCase):
+    def data(self):
+        return make_data(
+            mounts={
+                "1": {"SourceText_lang": "Achievement: Glory of the Test Raider"},
+                "2": {"SourceText_lang": "Achievement: Shared Title"},
+                "3": {"SourceText_lang": "Vendor: Bob Zone: Durotar"},
+                "4": {"SourceText_lang": "Achievement: Lonely Title"},
+            },
+            item_by_mount={"1": "item-1", "2": "item-2"},
+            achievement_by_reward_item={"item-1": {"500"}},
+            achievement_by_title={
+                "glory of the test raider": {"500"},
+                "shared title": {"900", "901"},
+                "lonely title": {"777"},
+            },
+        )
+
+    def test_reward_item_fk_wins(self):
+        self.assertEqual(self.data().achievement_for_mount("1"), "500")
+
+    def test_ambiguous_title_and_no_fk_is_skipped(self):
+        self.assertIsNone(self.data().achievement_for_mount("2"))
+
+    def test_unlabelled_mount_is_none(self):
+        self.assertIsNone(self.data().achievement_for_mount("3"))
+
+    def test_unambiguous_title_is_the_fallback(self):
+        self.assertEqual(self.data().achievement_for_mount("4"), "777")
+
+
+class TestZonesForAchievement(unittest.TestCase):
+    def test_direct_instance_id_resolves_to_its_zone(self):
+        data = make_data(
+            achievements={"10": {"Instance_ID": "700", "Criteria_tree": "0"}},
+            map_zone={"700": "2000"},
+            criteria_tree={}, criteria_tree_children={}, criteria={},
+        )
+        self.assertEqual(data.zones_for_achievement("10"), {"2000": "700"})
+
+    def test_type_8_meta_recursion_resolves_through_a_feat(self):
+        data = make_data(
+            achievements={
+                "meta": {"Instance_ID": "-1", "Criteria_tree": "t-root"},
+                "feat": {"Instance_ID": "800", "Criteria_tree": "0"},
+            },
+            map_zone={"800": "3000"},
+            criteria_tree={
+                "t-root": {"ID": "t-root", "Parent": "0", "CriteriaID": "0"},
+                "t-leaf": {"ID": "t-leaf", "Parent": "t-root", "CriteriaID": "c1"},
+            },
+            criteria_tree_children={"t-root": ["t-leaf"]},
+            criteria={"c1": {"Type": "8", "Asset": "feat"}},
+        )
+        self.assertEqual(data.zones_for_achievement("meta"), {"3000": "800"})
+
+    def test_a_self_referential_meta_cannot_loop(self):
+        data = make_data(
+            achievements={"a": {"Instance_ID": "-1", "Criteria_tree": "ta"}},
+            map_zone={},
+            criteria_tree={"ta": {"ID": "ta", "Parent": "0", "CriteriaID": "c"}},
+            criteria_tree_children={},
+            criteria={"c": {"Type": "8", "Asset": "a"}},
+        )
+        self.assertEqual(data.zones_for_achievement("a"), {})
+
+
+class TestAchievementGlobalCategory(unittest.TestCase):
+    def data(self):
+        return make_data(ach_categories={
+            "168": {"Parent": "-1"},
+            "95": {"Parent": "-1"},
+            "15499": {"Parent": "95"},
+        })
+
+    def test_dungeons_and_raids_is_not_global(self):
+        self.assertFalse(self.data()._achievement_in_global_category("168"))
+
+    def test_a_pvp_root_is_global(self):
+        self.assertTrue(self.data()._achievement_in_global_category("95"))
+
+    def test_a_category_nested_under_a_global_root_is_global(self):
+        self.assertTrue(self.data()._achievement_in_global_category("15499"))
+
+
+class TestAchievementBuild(unittest.TestCase):
+    """build()'s achievement branch, with zones_for_achievement stubbed."""
+
+    def make(self, category="168"):
+        data = make_data(
+            mounts={"50": {"ID": "50", "SourceTypeEnum": "2",
+                           "SourceText_lang": "Achievement: Glory of the Meta"}},
+            uimap={"2000": {"Type": "3"}, "2001": {"Type": "3"}},
+            uimap_by_name={},
+            item_by_mount={"50": "itm"},
+            item_expansion={},
+            achievement_by_reward_item={"itm": {"aid"}},
+            achievement_by_title={},
+            achievements={"aid": {"Instance_ID": "-1", "Criteria_tree": "0", "Category": category}},
+            ach_categories={"168": {"Parent": "-1"}, "95": {"Parent": "-1"}},
+            map_zone={}, map_instance_type={},
+            criteria_tree={}, criteria_tree_children={}, criteria={},
+        )
+        data.instance_mounts = lambda: {}
+        return data
+
+    def test_single_zone_resolution_places_the_mount(self):
+        data = self.make()
+        data.zones_for_achievement = lambda *a, **k: {"2000": "700"}
+        zones, source, subcat, expansion, faction, ach_ids, global_ids = gen.build(data)
+        self.assertIn("50", zones["2000"])
+        self.assertEqual(source["50"], "achievement")
+        self.assertEqual(ach_ids["50"], "aid")
+        self.assertNotIn("50", global_ids)
+
+    def test_multi_zone_resolution_records_the_id_but_stays_global(self):
+        data = self.make()
+        data.zones_for_achievement = lambda *a, **k: {"2000": "700", "2001": "701"}
+        _z, _s, _sc, _e, _f, ach_ids, global_ids = gen.build(data)
+        self.assertEqual(ach_ids["50"], "aid")
+        self.assertIn("50", global_ids)
+
+    def test_global_category_achievement_stays_global(self):
+        data = self.make(category="95")
+        data.zones_for_achievement = lambda *a, **k: {"2000": "700"}
+        _z, _s, _sc, _e, _f, ach_ids, global_ids = gen.build(data)
+        self.assertEqual(ach_ids["50"], "aid")
+        self.assertIn("50", global_ids)
+
+
 class TestBuild(unittest.TestCase):
     """End-to-end over the pure build(), with a hand-built Data."""
 
@@ -205,7 +362,7 @@ class TestBuild(unittest.TestCase):
         return d, gen.build(d)
 
     def test_vendor_mount_lands_in_its_named_zone(self):
-        _, (zones, source, subcat, expansion, faction, global_ids) = self.build()
+        _, (zones, source, subcat, expansion, faction, achievement_ids, global_ids) = self.build()
         self.assertIn("10", zones["84"])
         self.assertEqual(source["10"], "vendor")
         self.assertEqual(expansion["10"], "8")
@@ -217,7 +374,7 @@ class TestBuild(unittest.TestCase):
         self.assertEqual(subcat["11"], "raid")
 
     def test_class_and_shop_mounts_go_global(self):
-        _, (zones, source, subcat, expansion, faction, global_ids) = self.build()
+        _, (zones, source, subcat, expansion, faction, achievement_ids, global_ids) = self.build()
         self.assertIn("12", global_ids)
         self.assertIn("13", global_ids)
         for zone_ids in zones.values():
@@ -256,7 +413,7 @@ class TestSanity(unittest.TestCase):
         with tempfile.NamedTemporaryFile("w", suffix=".lua", delete=False, encoding="utf-8") as handle:
             handle.write(gen.render_lua(
                 {str(i): [str(n) for n in range(20)] for i in range(gen.MIN_ZONES + 20)},
-                {}, {}, {}, {}, self.HEALTHY_GLOBALS, "12.1.0.1",
+                {}, {}, {}, {}, {}, self.HEALTHY_GLOBALS, "12.1.0.1",
             ))
             path = handle.name
         try:
@@ -274,6 +431,7 @@ class TestRenderLua(unittest.TestCase):
             subcat={"101": "raid"},
             expansion={"100": "9"},
             faction={"101": "1"},
+            achievement_ids={"101": "12401"},
             global_ids=["500", "501"],
             build_id="12.1.0.69497",
         )
@@ -296,6 +454,7 @@ class TestRenderLua(unittest.TestCase):
         self.assertEqual(md["subcat"][101], "raid")
         self.assertEqual(md["expansion"][100], 9)
         self.assertEqual(md["faction"][101], 1)
+        self.assertEqual(md["achievementID"][101], 12401)
         self.assertEqual(list(md["global"].values()), [500, 501])
 
 
@@ -306,13 +465,27 @@ class TestFullGeneratorFixture(unittest.TestCase):
         "Mount": "Name_lang,SourceText_lang,ID,MountTypeID,Flags,SourceTypeEnum,SourceSpellID\n"
                  "Swift Stallion,Vendor: Bob Zone: Elwynn Forest Cost: 1,10,230,0,2,900\n"
                  "Raid Drake,Drop: Big Boss,11,230,0,1,901\n"
-                 "Warlock Steed,Class: Warlock,12,230,0,1,902\n",
-        "SpellName": "ID,Name_lang\n900,Swift Stallion\n901,Raid Drake\n902,Warlock Steed\n",
+                 "Warlock Steed,Class: Warlock,12,230,0,1,902\n"
+                 "Glory Drake,Achievement: Glory of the Test Raid Category: Dungeons & Raids,13,230,0,2,903\n"
+                 "War Bear,Achievement: For the Test Horde Category: Player vs. Player,14,230,0,2,904\n",
+        "SpellName": "ID,Name_lang\n900,Swift Stallion\n901,Raid Drake\n902,Warlock Steed\n"
+                     "903,Glory Drake\n904,War Bear\n",
         "ItemEffect": "ID,LegacySlotIndex,TriggerType,Charges,CoolDownMSec,CategoryCoolDownMSec,"
                       "SpellCategoryID,SpellID,ChrSpecializationID,PlayerConditionID\n"
-                      "70,0,6,0,0,0,0,900,0,0\n71,0,6,0,0,0,0,901,0,0\n",
-        "ItemXItemEffect": "ID,ItemEffectID,ItemID\n1,70,500\n2,71,501\n",
-        "ItemSparse": "ID,Description_lang,Display_lang,ExpansionID\n500,,Swift Stallion,9\n501,,Raid Drake,8\n",
+                      "70,0,6,0,0,0,0,900,0,0\n71,0,6,0,0,0,0,901,0,0\n"
+                      "72,0,6,0,0,0,0,903,0,0\n73,0,6,0,0,0,0,904,0,0\n",
+        "ItemXItemEffect": "ID,ItemEffectID,ItemID\n1,70,500\n2,71,501\n3,72,503\n4,73,504\n",
+        "ItemSparse": "ID,Description_lang,Display_lang,ExpansionID\n500,,Swift Stallion,9\n501,,Raid Drake,8\n"
+                      "503,,Glory Drake,9\n504,,War Bear,3\n",
+        "Achievement": "Description_lang,Title_lang,Reward_lang,ID,Instance_ID,Faction,Supercedes,Category,"
+                       "Minimum_criteria,Points,Flags,Ui_order,IconFileID,RewardItemID,Criteria_tree\n"
+                       ",Glory of the Test Raid,,999,700,-1,0,168,0,10,0,0,0,503,0\n"
+                       ",For the Test Horde,,998,700,-1,0,95,0,10,0,0,0,504,0\n",
+        "Achievement_Category": "Name_lang,ID,Parent,Ui_order\n"
+                                "Dungeons & Raids,168,-1,7\nPlayer vs. Player,95,-1,6\n",
+        "Criteria": "ID,Asset,StartAsset,FailAsset,ModifierTreeId,StartEvent,StartTimer,"
+                    "FailEvent,FailTimer,Flags,EligibilityWorldStateID,EligibilityWorldStateValue,Type\n",
+        "CriteriaTree": "Description_lang,ID,Amount,Operator,Parent,Flags,OrderIndex,CriteriaID\n",
         "JournalEncounterItem": "ID,JournalEncounterID,ItemID,FactionMask,Flags,DifficultyMask\n"
                                 "1,900,501,0,0,0\n",
         "JournalEncounter": "Name_lang,Description_lang,Map[0],Map[1],ID,JournalInstanceID,"
@@ -339,7 +512,7 @@ class TestFullGeneratorFixture(unittest.TestCase):
                 with open(os.path.join(build_dir, f"{name}.csv"), "w", encoding="utf-8", newline="") as fh:
                     fh.write(body)
             data = gen.Data("12.1.0.1", tmp, "enUS")
-            zones, source, subcat, expansion, faction, global_ids = gen.build(data)
+            zones, source, subcat, expansion, faction, achievement_ids, global_ids = gen.build(data)
 
         self.assertIn("37", zones)               # Elwynn Forest, from the vendor text
         self.assertIn("10", zones["37"])
@@ -350,9 +523,23 @@ class TestFullGeneratorFixture(unittest.TestCase):
         self.assertIn("12", global_ids)              # the class mount
         self.assertEqual(expansion["10"], "9")
 
-        text = gen.render_lua(zones, source, subcat, expansion, faction, global_ids, "12.1.0.1")
+        # Achievement-reward mount: linked via RewardItemID, placed under the
+        # achievement's instance because it resolves to exactly one zone.
+        self.assertEqual(achievement_ids["13"], "999")
+        self.assertIn("13", zones["2000"])
+        self.assertEqual(source["13"], "achievement")
+        self.assertEqual(subcat["13"], "raid")
+        self.assertNotIn("13", global_ids)
+        # PvP-category achievement mount: link recorded, but it stays global.
+        self.assertEqual(achievement_ids["14"], "998")
+        self.assertIn("14", global_ids)
+
+        text = gen.render_lua(
+            zones, source, subcat, expansion, faction, achievement_ids, global_ids, "12.1.0.1"
+        )
         self.assertIn("addon.MountData", text)
         self.assertIn(textwrap.dedent("    global = {").strip(), text)
+        self.assertIn("[13] = 999,", text)
 
 
 if __name__ == "__main__":

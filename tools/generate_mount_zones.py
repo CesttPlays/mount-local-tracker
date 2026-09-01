@@ -52,6 +52,10 @@ TABLES = [
     "Map",
     "UiMap",
     "UiMapAssignment",
+    "Achievement",
+    "Achievement_Category",
+    "Criteria",
+    "CriteriaTree",
 ]
 
 # UiMap.Type: 2 Continent, 3 Zone, 4 Dungeon, 5 Micro, 6 Orphan (cities / BGs).
@@ -63,6 +67,16 @@ UIMAP_ZONE_TYPES = {"3", "4", "6"}
 
 # Map.InstanceType -> mount subcategory for the instance pass (1 party, 2 raid).
 INSTANCE_SUBCAT = {"1": "dungeon", "2": "raid"}
+
+# Achievement.Criteria "Type" 8 = "complete another achievement" (meta rollup).
+CRITERIA_COMPLETE_ACHIEVEMENT = "8"
+# How deep to follow type-8 meta criteria. Classic "Glory of the <Raid> Raider"
+# is meta -> per-boss feat (depth 2); modern raid metas carry Instance_ID direct.
+ACHIEVEMENT_META_DEPTH = 2
+# An achievement whose category chain reaches one of these roots is never
+# zone-local, even when it resolves to a single instance: 1 Statistics,
+# 81 Feats of Strength, 95 Player vs. Player, 155 World Events, 201 Reputation.
+ACHIEVEMENT_GLOBAL_CATEGORY_ROOTS = {"1", "81", "95", "155", "201"}
 
 # A SourceText that names more than this many distinct zones is an
 # everywhere-vendor (holiday merchants in every capital) -> treat as global.
@@ -181,6 +195,32 @@ def zone_names_from_text(text: str) -> list[str]:
     return names
 
 
+_ACHIEVEMENT_LABEL_RE = re.compile(
+    r"Achievement:\s*(.+?)(?=\s+(?:World Event|[A-Z][a-z]+):|$)"
+)
+
+
+def normalize_achievement_title(text: str) -> str:
+    """Lowercase, fold every non-alphanumeric run to a space, collapse whitespace.
+
+    Lets the lightly-mangled SourceText label ("For The Horde!") match the real
+    Achievement.Title_lang ("For the Horde!") without a false match on case or a
+    stray "!". Applied to both sides of the name-fallback link, so a difficulty
+    suffix ("... (25 player)") still reads as a distinct title and cannot
+    collapse into an ambiguous match.
+    """
+    text = re.sub(r"[^a-z0-9 ]+", " ", clean_text(text).lower())
+    return re.sub(r"\s+", " ", text).strip()
+
+
+def achievement_title_from_text(text: str) -> str | None:
+    """The normalized achievement name after an 'Achievement:' label, or None."""
+    match = _ACHIEVEMENT_LABEL_RE.search(text)
+    if not match:
+        return None
+    return normalize_achievement_title(match.group(1)) or None
+
+
 def normalize_region(row: dict) -> tuple[float, ...] | None:
     try:
         min_x, min_y, _, max_x, max_y, _ = (float(row[f"Region[{i}]"]) for i in range(6))
@@ -264,6 +304,27 @@ class Data:
         self.instances = {row["ID"]: row for row in tables["JournalInstance"]}
         self.encounter_items = tables["JournalEncounterItem"]
 
+        # -- achievement-reward resolution ------------------------------------
+        self.achievements = {row["ID"]: row for row in tables["Achievement"]}
+        self.ach_categories = {row["ID"]: row for row in tables["Achievement_Category"]}
+        self.criteria = {row["ID"]: row for row in tables["Criteria"]}
+        self.criteria_tree: dict[str, dict] = {}
+        self.criteria_tree_children: dict[str, list[str]] = {}
+        for row in tables["CriteriaTree"]:
+            self.criteria_tree[row["ID"]] = row
+            self.criteria_tree_children.setdefault(row["Parent"], []).append(row["ID"])
+
+        # normalized title -> {achievementID}  and  reward itemID -> {achievementID}
+        self.achievement_by_title: dict[str, set[str]] = {}
+        self.achievement_by_reward_item: dict[str, set[str]] = {}
+        for row in tables["Achievement"]:
+            title = normalize_achievement_title(row["Title_lang"])
+            if title:
+                self.achievement_by_title.setdefault(title, set()).add(row["ID"])
+            reward_item = row.get("RewardItemID") or "0"
+            if reward_item != "0":
+                self.achievement_by_reward_item.setdefault(reward_item, set()).add(row["ID"])
+
     # -- instance pass --------------------------------------------------------
 
     def instance_mounts(self) -> dict[str, tuple[str, str]]:
@@ -303,6 +364,101 @@ class Data:
             return set()  # name collided with many sub-maps ("Torghast")
         return zones
 
+    # -- achievement pass -------------------------------------------------
+
+    def _achievement_in_global_category(self, category_id: str) -> bool:
+        """True if the achievement's category chain hits a never-zone-local root."""
+        seen: set[str] = set()
+        current = category_id
+        while current and current not in ("-1", "") and current not in seen:
+            if current in ACHIEVEMENT_GLOBAL_CATEGORY_ROOTS:
+                return True
+            seen.add(current)
+            node = self.ach_categories.get(current)
+            if not node:
+                return False
+            current = node["Parent"]
+        return False
+
+    def _criteria_leaves(self, root_tree_id: str) -> list[tuple[str, str]]:
+        """[(criteriaType, asset), ...] for the leaves under a criteria tree."""
+        if root_tree_id in ("0", ""):
+            return []  # no tree -- "0" is not the forest root
+        out: list[tuple[str, str]] = []
+        stack = [root_tree_id]
+        seen: set[str] = set()
+        while stack:
+            tree_id = stack.pop()
+            if tree_id in seen:
+                continue
+            seen.add(tree_id)
+            children = self.criteria_tree_children.get(tree_id)
+            if children:
+                stack.extend(children)
+                continue
+            node = self.criteria_tree.get(tree_id)
+            if not node:
+                continue
+            criterion = self.criteria.get(node["CriteriaID"])
+            if criterion and node["CriteriaID"] != "0":
+                out.append((criterion["Type"], criterion["Asset"]))
+        return out
+
+    def achievement_for_mount(self, mount_id: str) -> str | None:
+        """The achievement id a mount's 'Achievement:' label refers to, or None.
+
+        RewardItemID FK first (via the teaching item); an exact
+        normalized-title match is the fallback, used only when unambiguous.
+        Anything ambiguous or unlabelled -> None (the mount stays as it was).
+        """
+        row = self.mounts.get(mount_id)
+        if not row:
+            return None
+        title = achievement_title_from_text(clean_text(row["SourceText_lang"]))
+        if title is None:
+            return None
+        item_id = self.item_by_mount.get(mount_id)
+        fk_hits = self.achievement_by_reward_item.get(item_id or "", set())
+        name_hits = self.achievement_by_title.get(title, set())
+        if len(fk_hits) == 1:
+            return next(iter(fk_hits))
+        if len(fk_hits) > 1:
+            both = fk_hits & name_hits
+            return next(iter(both)) if len(both) == 1 else None
+        if len(name_hits) == 1:
+            return next(iter(name_hits))
+        return None
+
+    def zones_for_achievement(
+        self, achievement_id: str, depth: int = ACHIEVEMENT_META_DEPTH,
+        stack: tuple[str, ...] = (),
+    ) -> dict[str, str]:
+        """uiMapID -> the instance Map.ID that resolved it.
+
+        Achievement.Instance_ID -> map_zone, recursing type-8 (complete
+        achievement) meta criteria so classic "Glory of the <Raid> Raider"
+        metas resolve through their per-boss feat achievements.
+        """
+        if achievement_id in stack:
+            return {}
+        row = self.achievements.get(achievement_id)
+        if not row:
+            return {}
+        out: dict[str, str] = {}
+        instance_id = row.get("Instance_ID", "-1")
+        if instance_id not in ("-1", "0", ""):
+            mapped = self.map_zone.get(instance_id)
+            if mapped:
+                out.setdefault(mapped, instance_id)
+        if depth > 0:
+            for criteria_type, asset in self._criteria_leaves(row.get("Criteria_tree", "")):
+                if criteria_type == CRITERIA_COMPLETE_ACHIEVEMENT:
+                    for zone, map_id in self.zones_for_achievement(
+                        asset, depth - 1, stack + (achievement_id,)
+                    ).items():
+                        out.setdefault(zone, map_id)
+        return out
+
 
 # ------------------------------------------------------------------- the build
 
@@ -312,6 +468,7 @@ def build(data: Data):
     subcat: dict[str, str] = {}
     expansion: dict[str, str] = {}
     faction: dict[str, str] = {}
+    achievement_ids: dict[str, str] = {}
     global_ids: set[str] = set()
 
     instance_map = data.instance_mounts()
@@ -327,6 +484,13 @@ def build(data: Data):
         if fac:
             faction[mount_id] = fac
 
+        # Record the achievement link for every confidently-linked mount, zoned
+        # or not -- it lights up the addon's `achievement_gated` obtainability
+        # state ("Achievement needed - <name>").
+        achievement_id = data.achievement_for_mount(mount_id)
+        if achievement_id:
+            achievement_ids[mount_id] = achievement_id
+
         resolved: set[str] = set()
 
         if mount_id in instance_map:
@@ -340,6 +504,26 @@ def build(data: Data):
             resolved |= data.zones_for_name_list(zone_names_from_text(text))
 
         resolved = {z for z in resolved if z in data.uimap}
+
+        # Achievement -> zone, for a labelled mount that text / loot left flat.
+        # Only a single-instance resolution is trusted; multi-zone metas ("Glory
+        # of the <Expansion> Hero") and global-category achievements (PvP /
+        # world-event / feats of strength) stay global.
+        if not resolved and achievement_id and not data._achievement_in_global_category(
+            data.achievements[achievement_id].get("Category", "")
+        ):
+            ach_zones = {
+                zone: map_id
+                for zone, map_id in data.zones_for_achievement(achievement_id).items()
+                if zone in data.uimap
+            }
+            if len(ach_zones) == 1:
+                zone_id, map_id = next(iter(ach_zones.items()))
+                resolved.add(zone_id)
+                source[mount_id] = "achievement"
+                subcat[mount_id] = INSTANCE_SUBCAT.get(
+                    data.map_instance_type.get(map_id, ""), "raid"
+                )
 
         if not resolved:
             global_ids.add(mount_id)
@@ -361,6 +545,7 @@ def build(data: Data):
         subcat,
         expansion,
         faction,
+        achievement_ids,
         sorted(global_ids, key=int),
     )
 
@@ -376,7 +561,7 @@ def _lua_map(name: str, comment: str, pairs, fmt) -> list[str]:
     return lines
 
 
-def render_lua(zones, source, subcat, expansion, faction, global_ids, build_id: str) -> str:
+def render_lua(zones, source, subcat, expansion, faction, achievement_ids, global_ids, build_id: str) -> str:
     lines = [
         "local _, addon = ...",
         "",
@@ -412,9 +597,15 @@ def render_lua(zones, source, subcat, expansion, faction, global_ids, build_id: 
         sorted(faction, key=int), lambda m: f"[{m}] = {faction[m]},",
     )
 
+    lines += _lua_map(
+        "achievementID",
+        "[mountID] = achievementID  (mount is a reward for finishing that achievement)",
+        sorted(achievement_ids, key=int),
+        lambda m: f"[{m}] = {achievement_ids[m]},",
+    )
+
     lines.append("    -- optional / obtainability inputs -- generator leaves these for Overrides.lua")
     lines.append("    points = {},")
-    lines.append("    achievementID = {},")
     lines.append("    repFaction = {},")
     lines.append("    vendor = {},")
     lines.append("")
@@ -485,14 +676,14 @@ def main() -> int:
     print(f"build: {build_id}")
 
     data = Data(build_id, args.cache, args.locale)
-    zones, source, subcat, expansion, faction, global_ids = build(data)
+    zones, source, subcat, expansion, faction, achievement_ids, global_ids = build(data)
 
     ref_count = sum(len(ids) for ids in zones.values())
     print(
         f"mapped {len(zones)} zones, {ref_count} mount references, "
         f"{len(source)} classified, {len(subcat)} sub-categorised, "
         f"{len(expansion)} with expansion, {len(faction)} faction-specific, "
-        f"{len(global_ids)} global"
+        f"{len(achievement_ids)} achievement-linked, {len(global_ids)} global"
     )
 
     out_path = os.path.abspath(args.out)
@@ -503,7 +694,9 @@ def main() -> int:
         return 1
 
     with open(out_path, "w", encoding="utf-8", newline="\n") as handle:
-        handle.write(render_lua(zones, source, subcat, expansion, faction, global_ids, build_id))
+        handle.write(render_lua(
+            zones, source, subcat, expansion, faction, achievement_ids, global_ids, build_id,
+        ))
     print(f"wrote {out_path}")
 
     summary = os.environ.get("GITHUB_STEP_SUMMARY")

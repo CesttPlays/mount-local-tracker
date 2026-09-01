@@ -60,3 +60,89 @@ Two independent deliverables (can ship separately):
 - `python tools/generate_mount_zones.py --build 12.1.0.69497 --out /tmp/x.lua` prints
   ~24 more zone refs, ~180 `achievementID` entries, ~24 fewer globals; sanity gate passes.
 - `./run-tests.ps1` → all green after the `test_mountdata.py` assertion bump.
+
+---
+
+## As executed (2026-09-01, branch `worktree-execute-plans-006-010`)
+
+### Approach fleshed out from the stub + spike
+
+**Linking (`Data.achievement_for_mount`)** — scoped to mounts carrying an
+`Achievement: <Title>` label in `SourceText_lang`:
+
+1. `Achievement.RewardItemID` → the mount's teaching item (`item_by_mount`). If
+   exactly one achievement rewards that item, that's the link.
+2. If several achievements reward the item, intersect with the normalized-title
+   matches and take it only if exactly one survives.
+3. Otherwise, a normalized exact `Title_lang` match — used only when exactly one
+   achievement has that title.
+4. Anything else → `None` (mount is untouched).
+
+`normalize_achievement_title` lowercases, turns every non-alphanumeric run into a
+space and collapses whitespace. That makes `"For The Horde!"` match
+`"For the Horde"` while keeping a difficulty suffix (`"... (25 player)"`) a
+*distinct* string so it can't create a false ambiguity.
+
+**Zone (`Data.zones_for_achievement`)** — `Achievement.Instance_ID` → the
+generator's existing `map_zone`, recursing type-8 ("complete achievement")
+criteria to depth 2 via a ported `_criteria_leaves` (minimal slice of the
+sibling's `criteria_leaves`, bracket column form). Returns `uiMapID → instance
+Map.ID` so the instance's `Map.InstanceType` still drives `subcat`.
+The quest-POI path and the category-name fallback were **not** ported (no
+labelled mount uses type-27 criteria; category-name match only adds noise).
+
+**Global-category guard (`_achievement_in_global_category`)** — the spike's
+"drop the 2 borderline metas" (`For The Horde!` → Eversong Woods,
+`Fates of the Shadowlands Raids` → Sanctum of Domination) is implemented
+structurally, not by hand: an achievement whose `Achievement_Category` chain
+reaches a root in `{1 Statistics, 81 Feats of Strength, 95 PvP, 155 World
+Events, 201 Reputation}` never contributes a zone, even on a single-instance
+resolution. This is the sibling generator's `SKIP_CATEGORY_ROOTS ∪
+GLOBAL_CATEGORY_ROOTS` idea. `achievementID` is still recorded for those mounts.
+
+**`build()` wiring** — after the instance-loot / SourceText passes, before the
+`global` fallthrough: record `achievementID` for every linked mount; then, only
+if the mount is still unplaced and the achievement is not global-category,
+resolve zones — exactly one → assign it with `source = "achievement"`; two or
+more → leave `global`.
+
+**`render_lua()`** — `achievementID` is now a populated `[mountID] = achID`
+map (int→int), pulled out of the "leave for Overrides" stub block.
+
+### Numbers (build 12.1.0.69497, generator run, not shipped)
+
+| metric | before | after |
+|---|---|---|
+| zones | 293 | 298 |
+| zone mount-references | 1846 | 1870 (+24) |
+| `global` mounts | 988 | 964 (−24) |
+| `achievementID` links | 0 | 183 |
+
+The 24 moved mounts are the "Glory of the <Raid> Raider" family (Ulduar →
+Manaforge Omega, incl. two Ulduar mounts) plus two Timewalking "Sanctum of
+Chronology" metas. Zero mounts became newly-global (no regressions). `272`
+(`For The Horde!`) and `1576` (`Fates of the Shadowlands Raids`) correctly
+stayed `global`. Sanity gate passes.
+
+### Deviations from the stub
+
+- **`MountData.lua` was NOT regenerated** and `tests/test_mountdata.py:151-153`
+  was **not** bumped to assert a non-empty `achievementID`. The stub's "Out of
+  scope" says regen + ship is a separate, in-game-validated step, and that
+  assertion can only pass once the file is regenerated. The
+  `test_optional_input_tables_are_present` key-presence check still passes as-is.
+  Bump it together with the regen (pairs with plan 007's
+  `EXPECTED_SUB_TABLES` change).
+- Files changed: `tools/generate_mount_zones.py`, `tests/test_generator.py`
+  (+17 tests, 35 → 52). Generator-tables cache gained `Achievement`,
+  `Achievement_Category`, `Criteria`, `CriteriaTree` (`.wago-cache/`, gitignored;
+  the weekly `refresh-mount-data.yml` will fetch them — ~17 MB total, acceptable).
+
+### In-game validation step (separate, for the maintainer)
+
+Regenerate `MountData.lua` (`python tools/generate_mount_zones.py --build <latest>`),
+`/reload`, then: (a) stand in Ulduar / Icecrown Citadel and confirm the Glory
+mounts show under the raid header; (b) hover an uncollected achievement-reward
+mount and confirm the tooltip reads "Achievement needed · <name>" instead of a
+bare "Not yet collected"; (c) confirm `Mountain o' Mounts` / `Leading the
+Cavalry` / keystone / Gladiator mounts are still under Global.
