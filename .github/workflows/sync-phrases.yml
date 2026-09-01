@@ -1,0 +1,39 @@
+name: Sync phrases to CurseForge
+
+# Uploads the English phrase set from Mount_Tracker_Local_Zones/Locales/enUS.lua
+# to CurseForge Localization (add/update only -- never --prune), so translators
+# always have the current source strings. Idempotent: safe to re-run.
+#
+# enUS.lua is the source of truth. The reverse direction (approved translations
+# back into Locales/<code>.lua) is refresh-locales.yml.
+#
+# Dispatch-only until the CurseForge project exists (needs CF_PROJECT_ID and the
+# CF_API_KEY secret in the "deploy" environment). Uncomment the push trigger
+# once that is in place, or just run tools/push_locale_phrases.py by hand.
+
+on:
+  workflow_dispatch:
+  # push:
+  #   branches: [main]
+  #   paths:
+  #     - "Mount_Tracker_Local_Zones/Locales/enUS.lua"
+
+permissions:
+  contents: read
+
+jobs:
+  push:
+    runs-on: ubuntu-latest
+    environment: deploy
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Push English phrases to CurseForge
+        env:
+          CF_API_KEY: ${{ secrets.CF_API_KEY }}
+          CF_PROJECT_ID: ${{ vars.CF_PROJECT_ID }}
+        run: python tools/push_locale_phrases.py
