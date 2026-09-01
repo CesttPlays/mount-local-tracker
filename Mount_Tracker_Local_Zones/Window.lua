@@ -1,4 +1,5 @@
 local _, addon = ...
+local L = addon.L
 
 -- The tracker window: a movable/resizable frame that hosts the ListView list,
 -- with a one-line collection summary under the title. Geometry persists to
@@ -261,7 +262,7 @@ local function InitializeWindow()
 	trackerWindow = CreateFrame("Frame", "MountTrackerWindow", UIParent, style.frameTemplate)
 	trackerWindow:SetFrameStrata("HIGH")
 	BuildChrome(trackerWindow, style)
-	SetWindowTitle(trackerWindow, "Mount Tracker")
+	SetWindowTitle(trackerWindow, L["Mount Tracker"])
 
 	MakeMovable(trackerWindow)
 
@@ -313,7 +314,7 @@ addon.InitializeWindow = InitializeWindow
 -- the existing frame keeps its old look until the UI reloads.
 function addon.NotifyWindowStyleChanged()
 	if trackerWindow then
-		addon.Print("Reload your UI (/reload) to apply the new window style.")
+		addon.Print(L["Reload your UI (/reload) to apply the new window style."])
 	end
 end
 
@@ -323,20 +324,17 @@ end
 
 local function SummaryText(zoneName)
 	local summary = addon.MountModel.Summary()
-	local text = string.format(
-		"%s \226\128\148 %d / %d collected",
-		zoneName or "Unknown",
+	local text = L["%s \226\128\148 %d / %d collected"]:format(
+		zoneName or L["Unknown"],
 		summary.zoneCollected,
 		summary.zoneTotal
 	)
 	if (summary.zoneAvailable or 0) > 0 then
-		text = text .. string.format(" |cff66cc66\194\183 %d available|r", summary.zoneAvailable)
+		text = text .. " " .. ("|cff66cc66\194\183 %s|r"):format(L["%d available"]:format(summary.zoneAvailable))
 	end
 	if summary.accountTotal and summary.accountTotal > 0 then
-		text = text .. string.format(
-			" |cff9d9d9d\194\183 %d / %d account|r",
-			summary.accountCollected or 0,
-			summary.accountTotal
+		text = text .. " " .. ("|cff9d9d9d\194\183 %s|r"):format(
+			L["%d / %d account"]:format(summary.accountCollected or 0, summary.accountTotal)
 		)
 	end
 	return text
@@ -348,12 +346,12 @@ local function RefreshTrackerWindow()
 	end
 
 	local groups, zoneName = addon.MountModel.GetZoneMounts()
-	SetWindowTitle(trackerWindow, "Mounts: " .. (zoneName or "Unknown"))
+	SetWindowTitle(trackerWindow, L["Mounts: %s"]:format(zoneName or L["Unknown"]))
 	trackerWindow.summary:SetText(SummaryText(zoneName))
 
 	local message = addon.MountModel.StatusFor(groups)
 	if not message and addon.ListView.Layout(groups) == 0 then
-		message = "Every mount here is already collected."
+		message = L["Every mount here is already collected."]
 	end
 
 	if message then
@@ -403,7 +401,7 @@ addon.ResetWindow = ResetWindow
 
 local function PrintZoneMountListToChat()
 	local groups, zoneName = addon.MountModel.GetZoneMounts()
-	addon.Print("Mounts for " .. (zoneName or "Unknown") .. ":")
+	addon.Print(L["Mounts for %s:"]:format(zoneName or L["Unknown"]))
 
 	local message = addon.MountModel.StatusFor(groups)
 	if message then
@@ -415,7 +413,7 @@ local function PrintZoneMountListToChat()
 	for _, group in ipairs(groups) do
 		if group.isGlobal and not printedGlobalDivider then
 			printedGlobalDivider = true
-			addon.Print("-- Global --")
+			addon.Print(("-- %s --"):format(L["Global"]))
 		end
 		addon.Print(string.format("%s (%d/%d)", group.label, group.collected, group.total))
 		for _, entry in ipairs(group.rows) do

@@ -215,14 +215,14 @@ end
 local function UpdateCurrentLocation()
 	state.lastZone = NormalizeLocationValue(SafeApiCall(GetRealZoneText))
 		or NormalizeLocationValue(SafeApiCall(GetZoneText))
-		or "Unknown"
+		or L["Unknown"]
 	return state.lastZone
 end
 
 -- Reads the cache filled by UpdateCurrentLocation (always called before anything
 -- asks for the location), so no live API fallback is needed here.
 local function GetCurrentLocationName()
-	return state.lastZone or "Unknown"
+	return state.lastZone or L["Unknown"]
 end
 
 addon.GetCurrentLocationName = GetCurrentLocationName
@@ -326,7 +326,7 @@ local function HandleSlashCommand(msg)
 		if addon.ResetWindow then
 			addon.ResetWindow()
 		end
-		Print("Window and section state reset.")
+		Print(L["Window and section state reset."])
 	elseif msg == "list" then
 		if addon.PrintZoneList then
 			addon.PrintZoneList()
@@ -335,11 +335,11 @@ local function HandleSlashCommand(msg)
 		if addon.OpenConfig then
 			addon.OpenConfig()
 		else
-			Print("Options are not available yet.")
+			Print(L["Options are not available yet."])
 		end
 	elseif msg == "debug" then
 		addon.db.debug = not addon.db.debug
-		Print("Debug output " .. (addon.db.debug and "enabled" or "disabled") .. ".")
+		Print(addon.db.debug and L["Debug output enabled."] or L["Debug output disabled."])
 	elseif msg == "map" then
 		if addon.Map then
 			addon.Map.Rebuild() -- pin count prints only when /mtlz debug is on
@@ -349,7 +349,7 @@ local function HandleSlashCommand(msg)
 			addon.ToggleWindow()
 		end
 	else
-		Print("Commands: /mtlz [show | list | config | map | debug | reset]")
+		Print(L["Commands: /mtlz [show | list | config | map | debug | reset]"])
 	end
 
 	ClearSlashInput()

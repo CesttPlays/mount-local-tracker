@@ -1,4 +1,5 @@
 local _, addon = ...
+local L = addon.L
 
 -- Collapsible grouped list for the tracker window, built on the Blizzard
 -- ScrollBox (WowScrollBoxList + MinimalScrollBar). The list is a flat sequence
@@ -29,7 +30,7 @@ local MINUS_TEXTURE = "Interface\\Buttons\\UI-MinusButton-Up"
 -- Global (class / racial / PvP / shop) groups start collapsed. Their collapsed
 -- state already lives under a "g:"-prefixed key from MountModel, so it never
 -- clashes with the same group shown as a real zone section.
-local GLOBAL_SEPARATOR_LABEL = "Global"
+local GLOBAL_SEPARATOR_LABEL = L["Global"]
 
 local DIM_ALPHA = 0.5 -- mounts your class/faction can't use, when they're shown
 
@@ -97,7 +98,7 @@ local function InitHeader(header, elementData)
 
 	local text = string.format("%s  |cff9d9d9d%d/%d|r", group.label, group.collected, group.total)
 	if (group.available or 0) > 0 then
-		text = text .. string.format("  |cff66cc66\194\183 %d available|r", group.available)
+		text = text .. "  " .. ("|cff66cc66\194\183 %s|r"):format(L["%d available"]:format(group.available))
 	end
 	header.label:SetText(text)
 end
@@ -146,7 +147,7 @@ local function InitRow(row, elementData)
 	row.label:SetTextColor(r, g, b)
 	row.label:SetAlpha(alpha)
 
-	row.status:SetText(entry.detail or (entry.state == "collected" and "collected") or "")
+	row.status:SetText(entry.detail or (entry.state == "collected" and L["collected"]) or "")
 	row.status:SetTextColor(r, g, b)
 	row.status:SetAlpha(alpha)
 end

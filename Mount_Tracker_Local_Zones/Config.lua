@@ -1,4 +1,5 @@
 local _, addon = ...
+local L = addon.L
 
 -- Options panel built on the retail Settings API (the old InterfaceOptions_*
 -- system was deprecated in 10.0). Settings are bound directly to the saved
@@ -144,14 +145,14 @@ local sourceFilterProxy = setmetatable({}, {
 })
 
 local function AddSourceFilters(category, layout)
-	AddSection(layout, "Filter by source")
+	AddSection(layout, L["Filter by source"])
 	for _, sourceType in ipairs(addon.MountModel.SOURCE_ORDER) do
 		local label = addon.MountModel.SourceLabel(sourceType)
 		local proxyKey = "show_" .. sourceType
 		local setting = Settings.RegisterAddOnSetting(
-			category, "MTLZ_" .. proxyKey, proxyKey, sourceFilterProxy, "boolean", "Show " .. label, true
+			category, "MTLZ_" .. proxyKey, proxyKey, sourceFilterProxy, "boolean", L["Show %s"]:format(label), true
 		)
-		Settings.CreateCheckbox(category, setting, ("Show %s mounts in the tracker list."):format(label:lower()))
+		Settings.CreateCheckbox(category, setting, L["Show %s mounts in the tracker list."]:format(label:lower()))
 		setting:SetValueChangedCallback(function()
 			OnSettingChanged("hiddenSources")
 		end)
@@ -182,7 +183,7 @@ local function BuildHiddenHeader(header)
 	header.restore = CreateFrame("Button", nil, header, "UIPanelButtonTemplate")
 	header.restore:SetSize(130, 20)
 	header.restore:SetPoint("RIGHT", header, "RIGHT", -2, 0)
-	header.restore:SetText("Restore section")
+	header.restore:SetText(L["Restore section"])
 
 	header.label = header:CreateFontString(nil, "ARTWORK", "GameFontNormal")
 	header.label:SetPoint("LEFT", header, "LEFT", 4, 0)
@@ -217,7 +218,7 @@ local function BuildHiddenRow(row)
 	row.restore = CreateFrame("Button", nil, row, "UIPanelButtonTemplate")
 	row.restore:SetSize(90, 22)
 	row.restore:SetPoint("RIGHT", row, "RIGHT", -2, 0)
-	row.restore:SetText("Restore")
+	row.restore:SetText(L["Restore"])
 
 	row.label = row:CreateFontString(nil, "ARTWORK", "GameFontHighlight")
 	row.label:SetPoint("LEFT", row.icon, "RIGHT", 8, 0)
@@ -263,18 +264,17 @@ local function AddHiddenMountsPanel(parentCategory)
 	intro:SetPoint("TOPRIGHT", panel, "TOPRIGHT", -10, -14)
 	intro:SetJustifyH("LEFT")
 	intro:SetText(
-		"Mounts you have hidden (right-click a mount -> Hide this mount). Hidden mounts "
-			.. "stay out of the tracker list and off the map."
+		L["Mounts you have hidden (right-click a mount -> Hide this mount). Hidden mounts stay out of the tracker list and off the map."]
 	)
 
 	local restoreAll = CreateFrame("Button", nil, panel, "UIPanelButtonTemplate")
 	restoreAll:SetSize(120, 24)
 	restoreAll:SetPoint("TOPRIGHT", panel, "TOPRIGHT", -10, -46)
-	restoreAll:SetText("Restore all")
+	restoreAll:SetText(L["Restore all"])
 
 	local empty = panel:CreateFontString(nil, "ARTWORK", "GameFontDisable")
 	empty:SetPoint("TOPLEFT", panel, "TOPLEFT", 12, -84)
-	empty:SetText("No hidden mounts.")
+	empty:SetText(L["No hidden mounts."])
 
 	local scrollBox = CreateFrame("Frame", nil, panel, "WowScrollBoxList")
 	scrollBox:SetPoint("TOPLEFT", panel, "TOPLEFT", 10, -80)
@@ -318,7 +318,7 @@ local function AddHiddenMountsPanel(parentCategory)
 				bucket.ids[#bucket.ids + 1] = id
 				bucket.entries[#bucket.entries + 1] = {
 					id = id,
-					name = (type(name) == "string" and name ~= "" and name) or ("Mount " .. id),
+					name = (type(name) == "string" and name ~= "" and name) or L["Mount %d"]:format(id),
 					icon = icon,
 					rebuild = Rebuild,
 				}
@@ -354,7 +354,7 @@ local function AddHiddenMountsPanel(parentCategory)
 
 	panel:SetScript("OnShow", Rebuild)
 
-	Settings.RegisterCanvasLayoutSubcategory(parentCategory, panel, "Hidden mounts")
+	Settings.RegisterCanvasLayoutSubcategory(parentCategory, panel, L["Hidden mounts"])
 end
 
 -- ============================================================================
@@ -369,85 +369,82 @@ function addon.SetupConfig()
 		return
 	end
 
-	local category, layout = Settings.RegisterVerticalLayoutCategory("Mount Tracker: Local Zones")
+	local category, layout = Settings.RegisterVerticalLayoutCategory(L["Mount Tracker: Local Zones"])
 
-	AddSection(layout, "Window")
+	AddSection(layout, L["Window"])
 	AddDropdown(
 		category,
 		"windowStyle",
-		"Window style",
-		"Classic uses the Blizzard dialog frame and scrollbar. Stylized uses a flat dark panel "
-			.. "with minimal controls. Reload your UI (/reload) after changing this.",
-		{ { "stylized", "Stylized" }, { "classic", "Classic" } }
+		L["Window style"],
+		L["Classic uses the Blizzard dialog frame and scrollbar. Stylized uses a flat dark panel with minimal controls. Reload your UI (/reload) after changing this."],
+		{ { "stylized", L["Stylized"] }, { "classic", L["Classic"] } }
 	)
 	AddCheckbox(
 		category,
 		"reopenWindow",
-		"Reopen on login",
-		"Reopen the tracker window when you log in if it was open when you logged out."
+		L["Reopen on login"],
+		L["Reopen the tracker window when you log in if it was open when you logged out."]
 	)
 
-	AddSection(layout, "Mount list")
+	AddSection(layout, L["Mount list"])
 	AddDropdown(
 		category,
 		"groupBy",
-		"Group by",
-		"How the tracked mounts are grouped in the list.",
-		{ { "source", "By source type" }, { "expansion", "By expansion" } }
+		L["Group by"],
+		L["How the tracked mounts are grouped in the list."],
+		{ { "source", L["By source type"] }, { "expansion", L["By expansion"] } }
 	)
 	AddCheckbox(
 		category,
 		"showCollected",
-		"Show collected mounts",
-		"Include mounts you already own. They appear greyed out in the list."
+		L["Show collected mounts"],
+		L["Include mounts you already own. They appear greyed out in the list."]
 	)
 	AddCheckbox(
 		category,
 		"showObtainableOnly",
-		"Only show obtainable mounts",
-		"Hide mounts you can't get right now (reputation locked, weekly farm already done, "
-			.. "achievement incomplete)."
+		L["Only show obtainable mounts"],
+		L["Hide mounts you can't get right now (reputation locked, weekly farm already done, achievement incomplete)."]
 	)
 	AddCheckbox(
 		category,
 		"showUnusable",
-		"Show unusable mounts",
-		"Include mounts your class or faction can't use. They appear dimmed. Turn off to hide them."
+		L["Show unusable mounts"],
+		L["Include mounts your class or faction can't use. They appear dimmed. Turn off to hide them."]
 	)
 	AddCheckbox(
 		category,
 		"showGlobal",
-		"Show global mounts",
-		"Also list mounts with no home zone (class, racial, PvP, store, promotion), under a "
-			.. "\"Global\" divider. Their sections start collapsed."
+		L["Show global mounts"],
+		L['Also list mounts with no home zone (class, racial, PvP, store, promotion), under a "Global" divider. Their sections start collapsed.']
 	)
 
 	AddSourceFilters(category, layout)
 
-	AddSection(layout, "Map & minimap")
+	AddSection(layout, L["Map & minimap"])
 	AddCheckbox(
 		category,
 		"showMinimapButton",
-		"Show minimap button",
-		"A button on the minimap that toggles the tracker (right-click for options)."
+		L["Show minimap button"],
+		L["A button on the minimap that toggles the tracker (right-click for options)."]
 	)
 	AddCheckbox(
 		category,
 		"showMapIcons",
-		"Show world map icons",
-		"An icon on the world map for each uncollected mount that has a known location."
+		L["Show world map icons"],
+		L["An icon on the world map for each uncollected mount that has a known location."]
 	)
 	AddCheckbox(
 		category,
 		"showMinimapIcons",
-		"Show minimap icons",
-		"An icon on the minimap for each nearby uncollected mount that has a known location."
+		L["Show minimap icons"],
+		L["An icon on the minimap for each nearby uncollected mount that has a known location."]
 	)
 	AddCheckbox(
 		category,
 		"showVendorIcons",
-		"Show vendor icons",
-		"Also mark the vendor on the map for mounts you can buy."
+		L["Show vendor icons"],
+		L["Also mark the vendor on the map for mounts you can buy."]
 	)
 
 	Settings.RegisterAddOnCategory(category)
@@ -460,6 +457,6 @@ function addon.OpenConfig()
 	if categoryID and type(Settings.OpenToCategory) == "function" then
 		Settings.OpenToCategory(categoryID)
 	else
-		addon.Print("Options panel is unavailable.")
+		addon.Print(L["Options panel is unavailable."])
 	end
 end

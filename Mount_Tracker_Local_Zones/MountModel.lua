@@ -1,4 +1,5 @@
 local _, addon = ...
+local L = addon.L
 
 -- Turns "the zone you're standing in" into a grouped list of the mounts you can
 -- still collect there. Zone membership comes from the datamined MountData plus
@@ -48,14 +49,14 @@ MountModel.CACHE_KEYS = CACHE_KEYS
 local SOURCE_ORDER = { "instance", "drop", "vendor", "quest", "zonedrop", "worldevent", "profession", "other" }
 MountModel.SOURCE_ORDER = SOURCE_ORDER
 local SOURCE_LABEL = {
-	instance = "Dungeon & Raid",
-	drop = "Rare Drop",
-	vendor = "Vendor",
-	quest = "Quest",
-	zonedrop = "Zone Drop",
-	worldevent = "World Event",
-	profession = "Profession",
-	other = "Other",
+	instance = L["Dungeon & Raid"],
+	drop = L["Rare Drop"],
+	vendor = L["Vendor"],
+	quest = L["Quest"],
+	zonedrop = L["Zone Drop"],
+	worldevent = L["World Event"],
+	profession = L["Profession"],
+	other = L["Other"],
 }
 local SOURCE_RANK = {}
 for index, key in ipairs(SOURCE_ORDER) do
@@ -64,14 +65,14 @@ end
 
 -- Label for a source-type string; unknown / nil -> "Other".
 function MountModel.SourceLabel(s)
-	return SOURCE_LABEL[s] or "Other"
+	return SOURCE_LABEL[s] or L["Other"]
 end
 
 -- Grouping bucket for a source-type string (groupBy == "source").
 -- Returns key, label, rank. nil / unknown source -> the "other" bucket.
 local function SourceBucket(source)
 	local s = source or "other"
-	return "s:" .. s, SOURCE_LABEL[s] or "Other", SOURCE_RANK[s] or SOURCE_RANK.other
+	return "s:" .. s, SOURCE_LABEL[s] or L["Other"], SOURCE_RANK[s] or SOURCE_RANK.other
 end
 
 -- ============================================================================
@@ -80,18 +81,18 @@ end
 
 -- Enum.ExpansionType-ish ids seen in ItemSparse. Negatives / 0 are classic-era.
 local EXPANSION_LABEL = {
-	[0] = "Classic",
-	[1] = "The Burning Crusade",
-	[2] = "Wrath of the Lich King",
-	[3] = "Cataclysm",
-	[4] = "Mists of Pandaria",
-	[5] = "Warlords of Draenor",
-	[6] = "Legion",
-	[7] = "Battle for Azeroth",
-	[8] = "Shadowlands",
-	[9] = "Dragonflight",
-	[10] = "The War Within",
-	[11] = "Midnight",
+	[0] = L["Classic"],
+	[1] = L["The Burning Crusade"],
+	[2] = L["Wrath of the Lich King"],
+	[3] = L["Cataclysm"],
+	[4] = L["Mists of Pandaria"],
+	[5] = L["Warlords of Draenor"],
+	[6] = L["Legion"],
+	[7] = L["Battle for Azeroth"],
+	[8] = L["Shadowlands"],
+	[9] = L["Dragonflight"],
+	[10] = L["The War Within"],
+	[11] = L["Midnight"],
 }
 
 -- Grouping bucket for an expansion id (groupBy == "expansion").
@@ -100,12 +101,12 @@ local EXPANSION_LABEL = {
 local function ExpansionBucket(raw)
 	local n = tonumber(raw)
 	if not n then
-		return "e:x", "Other", 99
+		return "e:x", L["Other"], 99
 	end
 	if n < 0 then
 		n = 0
 	end
-	return "e:" .. n, EXPANSION_LABEL[n] or "Other", -n
+	return "e:" .. n, EXPANSION_LABEL[n] or L["Other"], -n
 end
 
 -- ============================================================================
@@ -418,10 +419,10 @@ end
 
 function MountModel.StatusFor(groups)
 	if not addon.IsMountApiReady() then
-		return "Loading mounts..."
+		return L["Loading mounts..."]
 	end
 	if #groups == 0 then
-		return "No collectable mounts tracked for this zone."
+		return L["No collectable mounts tracked for this zone."]
 	end
 	return nil
 end

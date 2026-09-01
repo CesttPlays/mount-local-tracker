@@ -1,4 +1,5 @@
 local _, addon = ...
+local L = addon.L
 
 -- ============================================================================
 -- Mount actions (shared by the tracker window and the map pins)
@@ -32,13 +33,13 @@ local function MountName(mountID)
 	if type(name) == "string" and name ~= "" then
 		return name
 	end
-	return "Mount " .. tostring(mountID)
+	return L["Mount %d"]:format(mountID)
 end
 
 -- Open Blizzard's Mount Journal to a specific mount.
 local function OpenMount(mountID)
 	if InCombatLockdown() then
-		Print("Can't open the Mount Journal during combat.")
+		Print(L["Can't open the Mount Journal during combat."])
 		return
 	end
 
@@ -97,7 +98,7 @@ local function PlaceUserWaypoint(point)
 			C_SuperTrack.SetSuperTrackedUserWaypoint(true)
 		end
 	else
-		Print("Can't place a map pin for that mount here.")
+		Print(L["Can't place a map pin for that mount here."])
 	end
 end
 
@@ -110,7 +111,7 @@ local function SetTomTomWaypoint(point, mountID, title)
 	end
 	TomTom:AddWaypoint(point[1], point[2] / 10000, point[3] / 10000, {
 		title = title or MountName(mountID),
-		from = "Mount Tracker",
+		from = L["Mount Tracker"],
 		crazy = true,
 	})
 end
@@ -160,20 +161,20 @@ local function ShowMountMenu(frame)
 		-- A datamined spawn point wins; otherwise fall back to the vendor's
 		-- location so vendor-purchase mounts still get a waypoint.
 		if point then
-			rootDescription:CreateButton("Place map pin", function()
+			rootDescription:CreateButton(L["Place map pin"], function()
 				PlaceUserWaypoint(point)
 			end)
 			if hasTomTom then
-				rootDescription:CreateButton("Set TomTom waypoint", function()
+				rootDescription:CreateButton(L["Set TomTom waypoint"], function()
 					SetTomTomWaypoint(point, mountID)
 				end)
 			end
 		elseif vendorPoint then
-			rootDescription:CreateButton("Place map pin (vendor)", function()
+			rootDescription:CreateButton(L["Place map pin (vendor)"], function()
 				PlaceUserWaypoint(vendorPoint)
 			end)
 			if hasTomTom then
-				rootDescription:CreateButton("Set TomTom waypoint (vendor)", function()
+				rootDescription:CreateButton(L["Set TomTom waypoint (vendor)"], function()
 					local title = vendorNPC
 						and ("%s \194\183 %s"):format(MountName(mountID), vendorNPC)
 						or MountName(mountID)
@@ -186,11 +187,11 @@ local function ShowMountMenu(frame)
 			and C_MountJournal
 			and type(C_MountJournal.SummonByID) == "function"
 		then
-			rootDescription:CreateButton("Summon", function()
+			rootDescription:CreateButton(L["Summon"], function()
 				C_MountJournal.SummonByID(mountID)
 			end)
 		end
-		rootDescription:CreateButton("Hide this mount", function()
+		rootDescription:CreateButton(L["Hide this mount"], function()
 			SetMountHidden(mountID, true)
 		end)
 	end)

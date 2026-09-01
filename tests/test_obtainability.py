@@ -108,6 +108,10 @@ end
 addon.Print = function() end
 addon.DebugPrint = function() end
 
+-- Localization: Core.lua sets addon.L (an AceLocale table). Not loaded here, so
+-- stand in a silent-default table: every key resolves to itself (English text).
+addon.L = setmetatable({}, { __index = function(_, k) return k end })
+
 addon.Curated = function(field, id)
     local ov = addon.MountOverrides and addon.MountOverrides[field]
     if ov and ov[id] ~= nil then
