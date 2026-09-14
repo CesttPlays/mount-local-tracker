@@ -2,7 +2,7 @@
 ## Title: Mount Tracker: Local Zones
 ## Notes: Shows the mounts you can still collect in the zone you're standing in - and whether you can actually get them right now.
 ## Author: Cestt
-## Version: 0.1.0
+## Version: 0.1.1
 ## SavedVariables: MountTrackerLocalZonesDB
 ## OptionalDeps: !Mechanic, TomTom
 
