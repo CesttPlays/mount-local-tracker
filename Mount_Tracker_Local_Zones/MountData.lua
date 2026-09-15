@@ -5,7 +5,7 @@ local _, addon = ...
 
 addon.MountData = {
     build = "12.1.5.69594",
-    updated = "2026-09-14",
+    updated = "2026-09-15",
 
     -- [uiMapID] = { mountID, ... }
     zones = {
