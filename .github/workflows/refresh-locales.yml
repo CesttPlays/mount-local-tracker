@@ -1,9 +1,9 @@
 name: Refresh locales
 
 # Pulls approved translations from CurseForge Localization into
-# Mount_Tracker_Local_Zones/Locales/<locale>.lua and opens a pull request.
-# Never merges on its own -- the diff is reviewed and validated in-game (client
-# set to that language) first. Mirrors refresh-mount-data.yml.
+# Mount_Tracker_Local_Zones/Locales/<locale>.lua, opens a pull request, waits
+# for CI on it and squash-merges it when green. No release: translations ship
+# with the next one. Mirrors refresh-mount-data.yml.
 #
 # Dispatch-only until the CurseForge project exists (needs CF_PROJECT_ID, the
 # ## X-Curse-Project-ID .toc line, and the CF_API_KEY secret in the "deploy"
@@ -65,17 +65,28 @@ jobs:
             from CurseForge Localization. Only per-language files change;
             `Locales/enUS.lua` is the source of truth and is left alone.
 
-            **Before merging:** skim the diff, then log in with the client set to
-            each changed language (or `/console locale <code>` + `/reload`) and
-            eyeball the tracker window, `/mtlz config`, the right-click menu and
-            the minimap tooltip. Watch for clipped text and broken `%s` / `%d`.
+            **Auto-merged** once CI passes; ships with the next release.
           labels: automated
 
       # PRs opened with GITHUB_TOKEN don't fire other workflows' pull_request
       # trigger, so CI would never run on them. workflow_dispatch is exempt from
-      # that rule; its checks land on the branch head and show on the PR.
-      - name: Run CI on the PR branch
+      # that rule; its checks land on the branch head and show on the PR. Wait
+      # for it and merge on green.
+      - name: CI and merge
         if: steps.cpr.outputs.pull-request-operation == 'created' || steps.cpr.outputs.pull-request-operation == 'updated'
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh workflow run ci.yml --ref chore/refresh-locales
+          BRANCH: chore/refresh-locales
+          PR: ${{ steps.cpr.outputs.pull-request-number }}
+          SHA: ${{ steps.cpr.outputs.pull-request-head-sha }}
+        run: |
+          set -euo pipefail
+          gh workflow run ci.yml --ref "$BRANCH"
+          for _ in $(seq 30); do
+            run_id="$(gh run list --workflow ci.yml --commit "$SHA" --event workflow_dispatch -L 1 --json databaseId -q '.[0].databaseId')"
+            [ -n "$run_id" ] && break
+            sleep 5
+          done
+          [ -n "$run_id" ] || { echo "::error::CI run for $SHA never appeared"; exit 1; }
+          gh run watch "$run_id" --exit-status
+          gh pr merge "$PR" --squash --delete-branch
