@@ -2,6 +2,11 @@ package-as: Mount_Tracker_Local_Zones
 
 enable-nolib-creation: no
 
+# Written by release.yml right before packaging (version + note, not the git log).
+manual-changelog:
+  filename: CHANGELOG.md
+  markup-type: markdown
+
 # The addon lives in a subdirectory of the repo; hoist it to the zip root.
 move-folders:
   Mount_Tracker_Local_Zones/Mount_Tracker_Local_Zones: Mount_Tracker_Local_Zones
@@ -25,3 +30,4 @@ ignore:
   - .luacheckrc
   - CLAUDE.local.md
   - CURSEFORGE.md
+  - CHANGELOG.md

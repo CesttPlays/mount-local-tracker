@@ -1,4 +1,4 @@
-## Interface: 120100
+## Interface: 120100, 120105
 ## Title: Mount Tracker: Local Zones
 ## Notes: Shows the mounts you can still collect in the zone you're standing in - and whether you can actually get them right now.
 ## Author: Cestt

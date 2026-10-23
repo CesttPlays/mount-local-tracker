@@ -260,9 +260,9 @@ local function InitializeWindow()
 	local listTop = style.contentTop + (style.summaryHeight or 0)
 
 	trackerWindow = CreateFrame("Frame", "MountTrackerWindow", UIParent, style.frameTemplate)
-	trackerWindow:SetFrameStrata("HIGH")
+	trackerWindow:SetFrameStrata("MEDIUM")
 	BuildChrome(trackerWindow, style)
-	SetWindowTitle(trackerWindow, L["Mount Tracker"])
+	SetWindowTitle(trackerWindow, "Mount Tracker")
 
 	MakeMovable(trackerWindow)
 

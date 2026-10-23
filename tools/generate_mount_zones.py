@@ -129,6 +129,44 @@ def discover_build(major: str) -> str:
     raise RuntimeError(f"no {major}.x build found on wago.tools")
 
 
+# Lowest game Interface number the addon (and this generator) supports; matches
+# the floor declared in the .toc's `## Interface` line.
+MIN_INTERFACE = 120100  # 12.1.0
+
+
+def interface_from_build(build: str) -> str:
+    """"12.1.5.69594" -> "120105" (WoW's Interface-number encoding)."""
+    parts = build.split(".")
+    if len(parts) < 3:
+        raise ValueError(f"build '{build}' does not look like major.minor.patch[.rev]")
+    major, minor, patch = parts[0], parts[1], parts[2]
+    return f"{int(major)}{int(minor):02d}{int(patch):02d}"
+
+
+INTERFACE_LINE_RE = re.compile(r"^(## Interface:\s*)(.+?)\s*$")
+
+
+def sync_toc_interface(toc_path: str, build_id: str) -> bool:
+    """Add build_id's Interface number to the .toc's multi-Interface list if
+    it isn't already declared. Returns whether the file changed."""
+    new_iface = interface_from_build(build_id)
+    with open(toc_path, encoding="utf-8") as handle:
+        lines = handle.readlines()
+    for i, line in enumerate(lines):
+        match = INTERFACE_LINE_RE.match(line.rstrip("\n"))
+        if not match:
+            continue
+        entries = [e.strip() for e in match.group(2).split(",") if e.strip()]
+        if new_iface in entries:
+            return False
+        entries = sorted({*entries, new_iface}, key=int)
+        lines[i] = f"{match.group(1)}{', '.join(entries)}\n"
+        with open(toc_path, "w", encoding="utf-8", newline="\n") as handle:
+            handle.writelines(lines)
+        return True
+    raise RuntimeError(f"no '## Interface:' line found in {toc_path}")
+
+
 def load_table(table: str, build: str, cache_dir: str, locale: str) -> list[dict]:
     path = os.path.join(cache_dir, build, f"{table}.csv")
     if not os.path.exists(path):
@@ -561,6 +599,15 @@ def _lua_map(name: str, comment: str, pairs, fmt) -> list[str]:
     return lines
 
 
+UPDATED_STAMP = re.compile(r'^    updated = "[^"]*",$', re.M)
+
+
+def only_date_changed(old: str, new: str) -> bool:
+    """True when `new` matches `old` except for the `updated = "..."` stamp, so a
+    rerun with unchanged data leaves the file (and the refresh PR) alone."""
+    return UPDATED_STAMP.sub("", old) == UPDATED_STAMP.sub("", new)
+
+
 def render_lua(zones, source, subcat, expansion, faction, achievement_ids, global_ids, build_id: str) -> str:
     lines = [
         "local _, addon = ...",
@@ -670,10 +717,22 @@ def main() -> int:
             "Mount_Tracker_Local_Zones", "MountData.lua",
         ),
     )
+    parser.add_argument(
+        "--toc",
+        help="path to the .toc; if given, add this build's Interface number to "
+             "its `## Interface` list when it isn't already declared",
+    )
     args = parser.parse_args()
 
     build_id = args.build or discover_build(args.major)
     print(f"build: {build_id}")
+
+    iface = interface_from_build(build_id)
+    if int(iface) < MIN_INTERFACE:
+        print(f"SANITY: build {build_id} resolves to Interface {iface}, below the "
+              f"{MIN_INTERFACE} (12.1.0) floor -- refusing to generate from it",
+              file=sys.stderr)
+        return 1
 
     data = Data(build_id, args.cache, args.locale)
     zones, source, subcat, expansion, faction, achievement_ids, global_ids = build(data)
@@ -693,11 +752,25 @@ def main() -> int:
             print(f"SANITY: {problem}", file=sys.stderr)
         return 1
 
-    with open(out_path, "w", encoding="utf-8", newline="\n") as handle:
-        handle.write(render_lua(
-            zones, source, subcat, expansion, faction, achievement_ids, global_ids, build_id,
-        ))
-    print(f"wrote {out_path}")
+    rendered = render_lua(
+        zones, source, subcat, expansion, faction, achievement_ids, global_ids, build_id,
+    )
+    previous = ""
+    if os.path.exists(out_path):
+        with open(out_path, encoding="utf-8") as handle:
+            previous = handle.read()
+    if previous and only_date_changed(previous, rendered):
+        print(f"{out_path} unchanged (data identical), not rewritten")
+    else:
+        with open(out_path, "w", encoding="utf-8", newline="\n") as handle:
+            handle.write(rendered)
+        print(f"wrote {out_path}")
+
+    toc_updated = False
+    if args.toc:
+        toc_updated = sync_toc_interface(os.path.abspath(args.toc), build_id)
+        if toc_updated:
+            print(f"added Interface {iface} to {os.path.abspath(args.toc)}")
 
     summary = os.environ.get("GITHUB_STEP_SUMMARY")
     if summary:
@@ -706,6 +779,15 @@ def main() -> int:
                 f"- build `{build_id}`\n"
                 f"- {len(zones)} zones, {ref_count} references, {len(global_ids)} global mounts\n"
             )
+            if toc_updated:
+                handle.write(f"- added Interface `{iface}` to the .toc\n")
+
+    gh_output = os.environ.get("GITHUB_OUTPUT")
+    if gh_output:
+        with open(gh_output, "a", encoding="utf-8") as handle:
+            handle.write(f"build={build_id}\n")
+            handle.write(f"interface={iface}\n")
+            handle.write(f"toc_updated={'true' if toc_updated else 'false'}\n")
     return 0
 
 

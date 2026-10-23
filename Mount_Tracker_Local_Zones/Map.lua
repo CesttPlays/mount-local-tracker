@@ -15,6 +15,7 @@ local HBDPins = LibStub and LibStub("HereBeDragons-Pins-2.0", true)
 
 local FALLBACK_ICON = "Interface\\ICONS\\Ability_Mount_RidingHorse"
 local SHOW_ON_PARENT = HBD_PINS_WORLDMAP_SHOW_PARENT or 1
+local SHOW_CURRENT_ONLY = HBD_PINS_WORLDMAP_SHOW_CURRENT or 0
 
 -- Colour comes from addon.Obtainability (single source of truth, shared with the
 -- ListView rows). Alpha for dimmed states is a map-rendering choice, kept here.
@@ -184,6 +185,7 @@ function Map.Refresh()
 		Compute()
 	end
 
+	local showFlag = addon.db.showMapIconsOnContinent and SHOW_ON_PARENT or SHOW_CURRENT_ONLY
 	local placed, zoneCount = 0, 0
 	for uiMapID, entries in pairs(pins) do
 		zoneCount = zoneCount + 1
@@ -193,7 +195,7 @@ function Map.Refresh()
 			if wantWorld then
 				local worldPin = Acquire(worldPool, placed)
 				DressPin(worldPin, entry)
-				if not HBDPins:AddWorldMapIconMap(addon, worldPin, uiMapID, entry.x, entry.y, SHOW_ON_PARENT) then
+				if not HBDPins:AddWorldMapIconMap(addon, worldPin, uiMapID, entry.x, entry.y, showFlag) then
 					worldPin:Hide()
 				end
 			end

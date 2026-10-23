@@ -61,14 +61,11 @@ local function AddObtainabilityLines(mountID)
 	end
 end
 
--- Add or remove a mount from the "never show" list, then refresh every surface
--- that reads it. The zone list is cached by zone/map, which hiding does not
--- change, so the cache has to be invalidated explicitly.
-local function SetMountHidden(mountID, hidden)
-	if not (addon.db and addon.db.hidden) then
-		return
-	end
-	addon.db.hidden[mountID] = hidden and true or nil
+-- Refresh every surface that reads the hidden list. The zone list is cached by
+-- zone/map, which hiding does not change, so the cache has to be invalidated
+-- explicitly. Deferred a frame so a "Restore all" over N ids pays for one map
+-- rebuild, not N.
+local RefreshAfterHiddenChange = addon.Debounced(0, function()
 	if addon.MountModel then
 		addon.MountModel.InvalidateCache()
 	end
@@ -78,6 +75,15 @@ local function SetMountHidden(mountID, hidden)
 	if addon.Map then
 		addon.Map.Rebuild()
 	end
+end)
+
+-- Add or remove a mount from the "never show" list.
+local function SetMountHidden(mountID, hidden)
+	if not (addon.db and addon.db.hidden) then
+		return
+	end
+	addon.db.hidden[mountID] = hidden and true or nil
+	RefreshAfterHiddenChange()
 end
 
 addon.SetMountHidden = SetMountHidden
@@ -111,7 +117,7 @@ local function SetTomTomWaypoint(point, mountID, title)
 	end
 	TomTom:AddWaypoint(point[1], point[2] / 10000, point[3] / 10000, {
 		title = title or MountName(mountID),
-		from = L["Mount Tracker"],
+		from = "Mount Tracker",
 		crazy = true,
 	})
 end

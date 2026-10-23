@@ -43,7 +43,7 @@ read_globals = {
     "IsModifiedClick", "ChatEdit_InsertLink", "ChatFrame_OpenChat",
     "MenuUtil", "C_SuperTrack", "UiMapPoint", "TomTom",
     -- Map pins (HereBeDragons)
-    "LibStub", "HBD_PINS_WORLDMAP_SHOW_PARENT",
+    "LibStub", "HBD_PINS_WORLDMAP_SHOW_PARENT", "HBD_PINS_WORLDMAP_SHOW_CURRENT",
     -- ScrollBox list (Blizzard, Dragonflight+)
     "CreateScrollBoxListLinearView", "ScrollUtil", "CreateDataProvider", "ScrollBoxConstants",
     -- Settings panel (Blizzard)

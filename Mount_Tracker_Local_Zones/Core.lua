@@ -21,6 +21,7 @@ local defaults = {
 	showGlobal = false, -- also list mounts with no home zone (class / racial / PvP / store)
 	hiddenSources = {}, -- [sourceType] = true -- catalog-style "hide this whole source" filter
 	showMapIcons = true,
+	showMapIconsOnContinent = true, -- also draw world-map pins on the parent (continent) map
 	showMinimapIcons = true,
 	showVendorIcons = true, -- also pin vendor-purchase mounts at their vendor's location
 	showMinimapButton = true,
@@ -141,6 +142,8 @@ local function Debounced(delay, fn)
 		end)
 	end
 end
+
+addon.Debounced = Debounced
 
 -- ============================================================================
 -- Curated data
@@ -308,14 +311,6 @@ end)
 -- Slash command
 -- ============================================================================
 
-local function ClearSlashInput()
-	local chatFrame = DEFAULT_CHAT_FRAME
-	if chatFrame and chatFrame.editBox then
-		chatFrame.editBox:SetText("")
-		chatFrame.editBox:ClearFocus()
-	end
-end
-
 local function HandleSlashCommand(msg)
 	msg = (msg or ""):lower():match("^%s*(.-)%s*$")
 
@@ -337,6 +332,12 @@ local function HandleSlashCommand(msg)
 		else
 			Print(L["Options are not available yet."])
 		end
+	elseif msg == "hidden" then
+		if addon.OpenHiddenConfig then
+			addon.OpenHiddenConfig()
+		else
+			Print(L["Options are not available yet."])
+		end
 	elseif msg == "debug" then
 		addon.db.debug = not addon.db.debug
 		Print(addon.db.debug and L["Debug output enabled."] or L["Debug output disabled."])
@@ -349,10 +350,8 @@ local function HandleSlashCommand(msg)
 			addon.ToggleWindow()
 		end
 	else
-		Print(L["Commands: /mtlz [show | list | config | map | debug | reset]"])
+		Print(L["Commands: /mtlz [show | list | config | hidden | map | debug | reset]"])
 	end
-
-	ClearSlashInput()
 end
 
 SLASH_MTLZ1 = "/mtlz"
@@ -389,6 +388,7 @@ frame:SetScript("OnEvent", function(_, event, arg1)
 	if event == "ADDON_LOADED" then
 		if arg1 == addonName then
 			LoadSavedVariables()
+			frame:UnregisterEvent("ADDON_LOADED")
 		end
 		return
 	end

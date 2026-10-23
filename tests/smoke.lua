@@ -122,6 +122,21 @@ step("hide then restore a mount", function()
     check("mount restored", addon.db.hidden[victim] == nil)
 end)
 
+step("restoring several hidden mounts rebuilds the map once", function()
+    local original, calls = addon.Map.Rebuild, 0
+    addon.Map.Rebuild = function(...)
+        calls = calls + 1
+        return original(...)
+    end
+    for _, id in ipairs({ 9101, 9102, 9103 }) do addon.SetMountHidden(id, true) end
+    Harness.runTimers()
+    calls = 0
+    for _, id in ipairs({ 9101, 9102, 9103 }) do addon.SetMountHidden(id, false) end
+    Harness.runTimers()
+    addon.Map.Rebuild = original
+    check("one map rebuild for three restores", calls == 1, ("got %d rebuilds"):format(calls))
+end)
+
 -- ---------------------------------------------------------------------------
 -- Map / minimap pins (Map.lua)
 -- ---------------------------------------------------------------------------
@@ -243,7 +258,7 @@ end)
 -- Slash commands
 -- ---------------------------------------------------------------------------
 for _, cmd in ipairs({
-    "", "show", "toggle", "", "list", "config", "map", "debug", "debug",
+    "", "show", "toggle", "", "list", "config", "hidden", "map", "debug", "debug",
     "reset", "totally-unknown-subcommand",
 }) do
     step(("slash: /mtlz %q"):format(cmd), function()

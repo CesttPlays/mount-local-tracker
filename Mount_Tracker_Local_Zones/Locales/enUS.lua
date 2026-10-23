@@ -13,8 +13,6 @@ local L = LibStub("AceLocale-3.0"):NewLocale(addonName, "enUS", true, true) -- i
 if not L then return end
 
 -- Shared / fallbacks
-L["Mount Tracker"] = true
-L["Mount Tracker: Local Zones"] = true
 L["Mount %d"] = true
 L["Unknown"] = true
 L["Other"] = true
@@ -26,7 +24,7 @@ L["Window and section state reset."] = true
 L["Options are not available yet."] = true
 L["Debug output enabled."] = true
 L["Debug output disabled."] = true
-L["Commands: /mtlz [show | list | config | map | debug | reset]"] = true
+L["Commands: /mtlz [show | list | config | hidden | map | debug | reset]"] = true
 
 -- Mount Journal / actions (MountActions.lua)
 L["Can't open the Mount Journal during combat."] = true
@@ -130,6 +128,8 @@ L["Show minimap button"] = true
 L["A button on the minimap that toggles the tracker (right-click for options)."] = true
 L["Show world map icons"] = true
 L["An icon on the world map for each uncollected mount that has a known location."] = true
+L["Show map icons on continent maps"] = true
+L["Also show the world map icons when viewing the whole continent, not just the zone map."] = true
 L["Show minimap icons"] = true
 L["An icon on the minimap for each nearby uncollected mount that has a known location."] = true
 L["Show vendor icons"] = true

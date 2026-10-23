@@ -542,5 +542,73 @@ class TestFullGeneratorFixture(unittest.TestCase):
         self.assertIn("[13] = 999,", text)
 
 
+class TestInterfaceFromBuild(unittest.TestCase):
+    def test_encodes_major_minor_patch(self):
+        self.assertEqual(gen.interface_from_build("12.1.5.69594"), "120105")
+
+    def test_pads_single_digit_minor_and_patch(self):
+        self.assertEqual(gen.interface_from_build("12.1.0.68209"), "120100")
+
+    def test_build_without_revision_still_works(self):
+        self.assertEqual(gen.interface_from_build("12.1.5"), "120105")
+
+    def test_too_few_parts_raises(self):
+        with self.assertRaises(ValueError):
+            gen.interface_from_build("12.1")
+
+
+class TestSyncTocInterface(unittest.TestCase):
+    def write_toc(self, interface_line):
+        handle = tempfile.NamedTemporaryFile(
+            mode="w", suffix=".toc", delete=False, encoding="utf-8", newline="\n"
+        )
+        handle.write(f"## Interface: {interface_line}\n## Title: Test\n")
+        handle.close()
+        self.addCleanup(os.remove, handle.name)
+        return handle.name
+
+    def read(self, path):
+        with open(path, encoding="utf-8") as fh:
+            return fh.read()
+
+    def test_adds_a_new_interface_in_ascending_order(self):
+        path = self.write_toc("120100")
+        changed = gen.sync_toc_interface(path, "12.1.5.69594")
+        self.assertTrue(changed)
+        self.assertIn("## Interface: 120100, 120105\n", self.read(path))
+
+    def test_already_declared_interface_is_left_untouched(self):
+        path = self.write_toc("120100, 120105")
+        before = self.read(path)
+        changed = gen.sync_toc_interface(path, "12.1.5.69594")
+        self.assertFalse(changed)
+        self.assertEqual(self.read(path), before)
+
+    def test_missing_interface_line_raises(self):
+        handle = tempfile.NamedTemporaryFile(
+            mode="w", suffix=".toc", delete=False, encoding="utf-8", newline="\n"
+        )
+        handle.write("## Title: Test\n")
+        handle.close()
+        self.addCleanup(os.remove, handle.name)
+        with self.assertRaises(RuntimeError):
+            gen.sync_toc_interface(handle.name, "12.1.5.69594")
+
+
+class TestOnlyDateChanged(unittest.TestCase):
+    OLD = 'addon.MountData = {\n    build = "12.1.5.1",\n    updated = "2026-09-21",\n    zones = { [1] = { 610 } },\n'
+
+    def test_date_only_difference_is_ignored(self):
+        new = self.OLD.replace("2026-09-21", "2026-10-02")
+        self.assertTrue(gen.only_date_changed(self.OLD, new))
+
+    def test_data_change_is_detected(self):
+        new = self.OLD.replace("2026-09-21", "2026-10-02").replace("610", "611")
+        self.assertFalse(gen.only_date_changed(self.OLD, new))
+
+    def test_build_change_is_detected(self):
+        self.assertFalse(gen.only_date_changed(self.OLD, self.OLD.replace("12.1.5.1", "12.1.5.2")))
+
+
 if __name__ == "__main__":
     unittest.main()

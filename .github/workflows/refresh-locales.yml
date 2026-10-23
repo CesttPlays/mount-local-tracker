@@ -17,6 +17,7 @@ on:
 permissions:
   contents: write
   pull-requests: write
+  actions: write        # dispatch ci.yml on the PR branch (see last step)
 
 jobs:
   refresh:
@@ -43,9 +44,12 @@ jobs:
           done
 
       - name: Validate locale-file shape
-        run: python -m unittest discover -s tests -p "test_locales.py" -v
+        run: |
+          python -m pip install --quiet lupa
+          python -m unittest discover -s tests -p "test_locales.py" -v
 
       - name: Open pull request
+        id: cpr
         uses: peter-evans/create-pull-request@v6
         with:
           branch: chore/refresh-locales
@@ -56,8 +60,6 @@ jobs:
 
             Regenerated Locales/*.lua from CurseForge Localization by the
             refresh-locales workflow. Base language (enUS) is not touched.
-
-            Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
           body: |
             Automated refresh of `Mount_Tracker_Local_Zones/Locales/*.lua`
             from CurseForge Localization. Only per-language files change;
@@ -67,6 +69,13 @@ jobs:
             each changed language (or `/console locale <code>` + `/reload`) and
             eyeball the tracker window, `/mtlz config`, the right-click menu and
             the minimap tooltip. Watch for clipped text and broken `%s` / `%d`.
-
-            Generated with Claude Code
           labels: automated
+
+      # PRs opened with GITHUB_TOKEN don't fire other workflows' pull_request
+      # trigger, so CI would never run on them. workflow_dispatch is exempt from
+      # that rule; its checks land on the branch head and show on the PR.
+      - name: Run CI on the PR branch
+        if: steps.cpr.outputs.pull-request-operation == 'created' || steps.cpr.outputs.pull-request-operation == 'updated'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run ci.yml --ref chore/refresh-locales

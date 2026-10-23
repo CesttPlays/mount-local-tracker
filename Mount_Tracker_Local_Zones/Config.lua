@@ -6,6 +6,7 @@ local L = addon.L
 -- variables table, so no separate persistence is needed.
 
 local categoryID
+local hiddenCategoryID -- the "Hidden mounts" sub-panel, for /mtlz hidden
 
 -- The "Filter by source" section iterates addon.MountModel.SOURCE_ORDER (the one
 -- canonical source-type list) so its checkboxes always match the tracker list's
@@ -52,7 +53,7 @@ local function OnSettingChanged(key)
 
 	-- Map-only toggles: they change world/minimap icon rendering, nothing in the
 	-- tracker list.
-	if key == "showMapIcons" or key == "showMinimapIcons" then
+	if key == "showMapIcons" or key == "showMinimapIcons" or key == "showMapIconsOnContinent" then
 		if addon.Map then
 			addon.Map.Rebuild()
 		end
@@ -354,7 +355,8 @@ local function AddHiddenMountsPanel(parentCategory)
 
 	panel:SetScript("OnShow", Rebuild)
 
-	Settings.RegisterCanvasLayoutSubcategory(parentCategory, panel, L["Hidden mounts"])
+	local subcategory = Settings.RegisterCanvasLayoutSubcategory(parentCategory, panel, L["Hidden mounts"])
+	hiddenCategoryID = subcategory and subcategory.GetID and subcategory:GetID()
 end
 
 -- ============================================================================
@@ -369,7 +371,7 @@ function addon.SetupConfig()
 		return
 	end
 
-	local category, layout = Settings.RegisterVerticalLayoutCategory(L["Mount Tracker: Local Zones"])
+	local category, layout = Settings.RegisterVerticalLayoutCategory("Mount Tracker: Local Zones")
 
 	AddSection(layout, L["Window"])
 	AddDropdown(
@@ -436,6 +438,12 @@ function addon.SetupConfig()
 	)
 	AddCheckbox(
 		category,
+		"showMapIconsOnContinent",
+		L["Show map icons on continent maps"],
+		L["Also show the world map icons when viewing the whole continent, not just the zone map."]
+	)
+	AddCheckbox(
+		category,
 		"showMinimapIcons",
 		L["Show minimap icons"],
 		L["An icon on the minimap for each nearby uncollected mount that has a known location."]
@@ -458,5 +466,14 @@ function addon.OpenConfig()
 		Settings.OpenToCategory(categoryID)
 	else
 		addon.Print(L["Options panel is unavailable."])
+	end
+end
+
+-- /mtlz hidden: straight to the "Hidden mounts" sub-panel.
+function addon.OpenHiddenConfig()
+	if hiddenCategoryID and type(Settings.OpenToCategory) == "function" then
+		Settings.OpenToCategory(hiddenCategoryID)
+	else
+		addon.OpenConfig()
 	end
 end

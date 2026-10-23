@@ -9,12 +9,21 @@ name: Release
 #      refresh-mount-data.yml opens a PR that only touches MountData.lua when the
 #      datamined data actually moved, so merging that PR (after the in-game
 #      check) is the release signal -- but the release waits for CI to be green
-#      on the merge commit rather than running in parallel with it.
-#   2. Manual dispatch, with an optional exact version (blank = bump the patch).
+#      on the merge commit rather than running in parallel with it. Always
+#      uploaded to CurseForge as a full "Release".
+#   2. Manual dispatch: choose the CurseForge Release Type (Release / Beta /
+#      Alpha) for the upload, plus an optional exact version (blank = bump patch).
 #
-# Each run rewrites `## Version:` in the .toc to X.Y.Z, commits it to main with
-# [skip ci] (CI does not run on the bump, so no CI-completed event fires and
-# this workflow does not re-trigger), tags vX.Y.Z, and runs the packager.
+# The BigWigs packager has no flag for the CurseForge Release Type -- it reads it
+# from the git tag name (a tag containing "beta"/"alpha" uploads as that type,
+# anything else as Release). So the choice is encoded as a tag suffix:
+# release -> vX.Y.Z, beta -> vX.Y.Z-beta, alpha -> vX.Y.Z-alpha.
+#
+# Every run rewrites `## Version:` in the .toc to the computed version and
+# commits it [skip ci] so the tagged tree is self-consistent. Only a Release
+# pushes that commit to main (CI does not run on the bump, so no CI-completed
+# event fires and this workflow does not re-trigger); beta/alpha keep the commit
+# on the tag only and leave main untouched.
 #
 # Note: if CI fails on the merge commit, no release fires. Push the fix; if that
 # commit also touches MountData.lua the release fires on its green CI run,
@@ -27,10 +36,22 @@ on:
     branches: [main]
   workflow_dispatch:
     inputs:
+      curseforge_release_type:
+        description: "CurseForge Release Type for this upload"
+        type: choice
+        options:
+          - release
+          - beta
+          - alpha
+        default: release
       version:
-        description: "Exact version to release, e.g. 0.2.0 (blank = bump patch: 0.1.0 -> 0.1.1)"
+        description: "Exact version, e.g. 0.10.0 (blank = bump patch). Use a fresh version for each beta/alpha; re-running the same one fails on 'tag exists'."
         required: false
         default: ""
+      notes:
+        description: "Release notes (shown under the version heading)"
+        required: false
+        default: "Updated mount data."
 
 permissions:
   contents: write
@@ -94,53 +115,102 @@ jobs:
           fetch-depth: 0
           ref: ${{ github.event.workflow_run.head_sha || github.ref }}
 
-      - name: Compute release version
+      - name: Compute version and tag
         id: ver
         env:
           INPUT_VERSION: ${{ github.event.inputs.version }}
+          # empty on the workflow_run trigger -> defaults to a full Release
+          CF_TYPE: ${{ github.event.inputs.curseforge_release_type }}
         run: |
           set -euo pipefail
           TOC="Mount_Tracker_Local_Zones/Mount_Tracker_Local_Zones.toc"
+          cf_type="${CF_TYPE:-release}"
           current="$(grep -oP '^## Version:\s*\K[0-9.]+' "$TOC")"
-          echo "current TOC version: ${current}"
+          echo "current TOC version: ${current}, CurseForge release type: ${cf_type}"
+
+          # Sanity check: refuse to publish a build declaring compatibility
+          # below 12.1.0 -- catches an accidental revert of ## Interface that
+          # CI's test_toc.py would also fail, but this also covers the manual
+          # workflow_dispatch path, which skips CI entirely.
+          min_iface=120100
+          lowest="$(grep -oP '^## Interface:\s*\K.+' "$TOC" | tr -d ' ' | tr ',' '\n' | sort -n | head -1)"
+          if [ -z "${lowest}" ] || [ "${lowest}" -lt "${min_iface}" ]; then
+            echo "::error::TOC declares Interface '${lowest:-<none>}', below the ${min_iface} (12.1.0) floor"
+            exit 1
+          fi
+
           if [ -n "${INPUT_VERSION}" ]; then
-            next="${INPUT_VERSION}"
+            version="${INPUT_VERSION}"
           else
             IFS='.' read -r major minor patch <<< "${current}"
-            next="${major:-0}.${minor:-0}.$(( ${patch:-0} + 1 ))"
+            version="${major:-0}.${minor:-0}.$(( ${patch:-0} + 1 ))"
           fi
-          if ! printf '%s' "${next}" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+$'; then
-            echo "::error::computed version '${next}' is not X.Y.Z"
+          if ! printf '%s' "${version}" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "::error::computed version '${version}' is not X.Y.Z"
             exit 1
           fi
-          if git rev-parse -q --verify "refs/tags/v${next}" >/dev/null; then
-            echo "::error::tag v${next} already exists"
-            exit 1
-          fi
-          echo "version=${next}" >> "$GITHUB_OUTPUT"
-          echo "toc=${TOC}" >> "$GITHUB_OUTPUT"
-          echo "Releasing v${next}"
 
-      - name: Bump TOC, commit, tag
+          # The packager derives the CurseForge Release Type from the tag name,
+          # so encode the choice as a suffix.
+          case "${cf_type}" in
+            release) tag="v${version}" ;;
+            beta)    tag="v${version}-beta" ;;
+            alpha)   tag="v${version}-alpha" ;;
+            *) echo "::error::unknown release type '${cf_type}'"; exit 1 ;;
+          esac
+
+          if git rev-parse -q --verify "refs/tags/${tag}" >/dev/null; then
+            echo "::error::tag ${tag} already exists -- pass an explicit 'version' or delete the tag"
+            exit 1
+          fi
+
+          {
+            echo "version=${version}"
+            echo "tag=${tag}"
+            echo "cf_type=${cf_type}"
+            echo "toc=${TOC}"
+          } >> "$GITHUB_OUTPUT"
+          echo "Uploading ${tag} to CurseForge as: ${cf_type}"
+
+      - name: Bump TOC, tag, and (for a Release) push main
         env:
           VERSION: ${{ steps.ver.outputs.version }}
+          TAG: ${{ steps.ver.outputs.tag }}
+          CF_TYPE: ${{ steps.ver.outputs.cf_type }}
           TOC: ${{ steps.ver.outputs.toc }}
         run: |
           set -euo pipefail
-          sed -i -E "s/^## Version:.*/## Version: ${VERSION}/" "${TOC}"
           git config user.name  "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          if git diff --quiet -- "${TOC}"; then
-            echo "TOC already at ${VERSION}; tagging existing HEAD"
-          else
-            git add "${TOC}"
-            git commit -m "release: v${VERSION} [skip ci]"
-            git push origin HEAD:main
-          fi
-          git tag "v${VERSION}"
-          git push origin "v${VERSION}"
 
-      - name: Package and release
+          # Always write the computed version into the tree the tag points at, so
+          # the packaged build is self-consistent -- even a beta/alpha that never
+          # lands on main ships the right ## Version:.
+          sed -i -E "s/^## Version:.*/## Version: ${VERSION}/" "${TOC}"
+          git add "${TOC}"
+          git diff --cached --quiet || git commit -m "release: ${TAG} [skip ci]"
+
+          # A full Release advances main; beta/alpha keep the bump on the tag
+          # alone. Push main before tagging so a rejected push leaves no tag.
+          if [ "${CF_TYPE}" = "release" ]; then
+            git push origin HEAD:main
+          else
+            echo "Beta/Alpha upload -- main left untouched"
+          fi
+
+          git tag "${TAG}"
+          git push origin "${TAG}"
+
+      # .pkgmeta's manual-changelog points the packager at this file, so the
+      # GitHub Release + CurseForge changelog is just the version and the note
+      # instead of the git log.
+      - name: Write changelog
+        env:
+          TAG: ${{ steps.ver.outputs.tag }}
+          NOTES: ${{ github.event.inputs.notes || 'Updated mount data.' }}
+        run: printf '## %s\n\n%s\n' "$TAG" "$NOTES" > CHANGELOG.md
+
+      - name: Package and upload
         uses: BigWigsMods/packager@v2
         env:
           # packager reads GITHUB_OAUTH (not GITHUB_TOKEN) for the GitHub Release

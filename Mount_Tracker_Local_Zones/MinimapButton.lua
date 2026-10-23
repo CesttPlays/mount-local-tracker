@@ -10,7 +10,7 @@ local dataObject
 if LDB then
 	dataObject = LDB:NewDataObject(addonName, {
 		type = "launcher",
-		text = L["Mount Tracker"],
+		text = "Mount Tracker",
 		icon = "Interface\\ICONS\\Ability_Mount_RidingHorse",
 		OnClick = function(_, button)
 			if button == "RightButton" then
@@ -22,7 +22,7 @@ if LDB then
 			end
 		end,
 		OnTooltipShow = function(tooltip)
-			tooltip:AddLine(L["Mount Tracker: Local Zones"])
+			tooltip:AddLine("Mount Tracker: Local Zones")
 			tooltip:AddLine(L["Left-click to toggle the tracker"], 1, 1, 1)
 			tooltip:AddLine(L["Right-click for options"], 1, 1, 1)
 		end,

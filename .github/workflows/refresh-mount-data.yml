@@ -2,9 +2,11 @@ name: Refresh mount data
 
 # Regenerates Mount_Tracker_Local_Zones/MountData.lua from wago.tools DB2 data
 # -- the per-zone `zones` map plus the flat `global` list (class / racial / PvP /
-# TCG / shop mounts with no single home zone) -- and opens a pull request. Never
-# merges on its own: the diff must be reviewed and the addon validated in-game
-# first.
+# TCG / shop mounts with no single home zone). Since this already discovers the
+# newest game build, it also adds that build's Interface number to the .toc's
+# `## Interface` list when it isn't declared yet (the generator refuses to run
+# below the 12.1.0 floor). Opens a pull request and runs CI on it. Never merges
+# on its own: the diff must be reviewed and the addon validated in-game first.
 
 on:
   workflow_dispatch:
@@ -19,6 +21,7 @@ on:
 permissions:
   contents: write
   pull-requests: write
+  actions: write        # dispatch ci.yml on the PR branch (see last step)
 
 jobs:
   refresh:
@@ -31,13 +34,15 @@ jobs:
           python-version: "3.12"
 
       - name: Regenerate MountData.lua (zones + global list)
+        id: generate
         env:
           BUILD_INPUT: ${{ github.event.inputs.build }}
         run: |
+          TOC="Mount_Tracker_Local_Zones/Mount_Tracker_Local_Zones.toc"
           if [ -n "$BUILD_INPUT" ]; then
-            python tools/generate_mount_zones.py --build "$BUILD_INPUT"
+            python tools/generate_mount_zones.py --build "$BUILD_INPUT" --toc "$TOC"
           else
-            python tools/generate_mount_zones.py
+            python tools/generate_mount_zones.py --toc "$TOC"
           fi
 
       - name: Lua syntax check
@@ -46,23 +51,33 @@ jobs:
           lua5.1 -e "assert(loadfile('Mount_Tracker_Local_Zones/MountData.lua'))"
 
       - name: Open pull request
+        id: cpr
         uses: peter-evans/create-pull-request@v6
         with:
           branch: chore/refresh-mount-data
-          add-paths: Mount_Tracker_Local_Zones/MountData.lua
+          add-paths: |
+            Mount_Tracker_Local_Zones/MountData.lua
+            Mount_Tracker_Local_Zones/Mount_Tracker_Local_Zones.toc
           title: "chore: refresh mount data (zones + global)"
           commit-message: |
             chore: refresh mount data (zones + global)
 
             Regenerated from wago.tools DB2 by the refresh-mount-data workflow.
             Covers the per-zone map and the flat global mount list.
-
-            Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
+            Also adds the build's Interface number to the .toc when it's a
+            new one (see generate_mount_zones.py --toc).
           body: |
             Automated regeneration of `Mount_Tracker_Local_Zones/MountData.lua`
             from datamined game data -- both the per-zone `zones` map and the flat
             `global` list (class / racial / PvP / trading-card / shop mounts with
             no single home zone). Build and entry counts are in the run summary.
+
+            If `${{ steps.generate.outputs.build }}` is a newer game version than
+            the .toc already declares, its Interface number
+            (`${{ steps.generate.outputs.interface }}`) was added to the
+            `## Interface` list in this same PR (`toc_updated` =
+            `${{ steps.generate.outputs.toc_updated }}`). The generator refuses to
+            run at all on a build below 12.1.0 (Interface 120100).
 
             **Before merging:** skim the diff for unexpectedly large swings -- the
             generator fails the run outright if the zone reference count moves
@@ -72,6 +87,13 @@ jobs:
 
             Curated entries in `Overrides.lua` (rare-drop coords, lockouts, vendor
             costs) are untouched by this workflow.
-
-            🤖 Generated with [Claude Code](https://claude.com/claude-code)
           labels: automated
+
+      # PRs opened with GITHUB_TOKEN don't fire other workflows' pull_request
+      # trigger, so CI would never run on them. workflow_dispatch is exempt from
+      # that rule; its checks land on the branch head and show on the PR.
+      - name: Run CI on the PR branch
+        if: steps.cpr.outputs.pull-request-operation == 'created' || steps.cpr.outputs.pull-request-operation == 'updated'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run ci.yml --ref chore/refresh-mount-data

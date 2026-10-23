@@ -16,6 +16,10 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 ADDON = os.path.join(ROOT, "Mount_Tracker_Local_Zones")
 TOC = os.path.join(ADDON, "Mount_Tracker_Local_Zones.toc")
 
+# Lowest game Interface number the addon supports -- keep in sync with
+# MIN_INTERFACE in tools/generate_mount_zones.py.
+MIN_INTERFACE = 120100  # 12.1.0
+
 
 def read_toc_lines():
     with open(TOC, encoding="utf-8") as fh:
@@ -58,10 +62,25 @@ class TestToc(unittest.TestCase):
                 f"{rel} is listed in the .toc but missing on disk",
             )
 
-    def test_interface_version_is_five_or_six_digits(self):
+    def test_interface_is_an_ascending_list_at_or_above_the_floor(self):
+        # WoW's multi-Interface format: "## Interface: 120100, 120105" -- the
+        # client loads if any entry matches its own build. Declaring several
+        # lets one .toc cover 12.1.0 and later 12.1.x patches without a bump
+        # on every point release.
         directives = toc_directives()
         self.assertIn("Interface", directives)
-        self.assertRegex(directives["Interface"], r"^\d{5,6}$")
+        entries = [e.strip() for e in directives["Interface"].split(",")]
+        for entry in entries:
+            self.assertRegex(entry, r"^\d{5,6}$", f"'{entry}' is not a 5-6 digit Interface number")
+        values = [int(e) for e in entries]
+        self.assertEqual(
+            values, sorted(set(values)),
+            "## Interface entries must be ascending with no duplicates",
+        )
+        self.assertGreaterEqual(
+            values[0], MIN_INTERFACE,
+            f"lowest declared Interface must be >= {MIN_INTERFACE} (12.1.0)",
+        )
 
     def test_savedvariables_matches_luacheckrc(self):
         saved = toc_directives().get("SavedVariables", "")
